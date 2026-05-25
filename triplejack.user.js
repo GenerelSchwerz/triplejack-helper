@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Triplejack Helper
 // @namespace    https://triplejack.com/
-// @version      0.3.4
+// @version      0.3.5
 // @description  Translates Triplejack public chat and direct messages using Google Translate requests.
 // @author       Rocco A.
 // @license      MIT
@@ -885,6 +885,7 @@
     helperButton.type = "button";
     helperButton.title = "Translate Settings";
     helperButton.className = referenceButton.className;
+    helperButton.style.background = "transparent";
     helperButton.style.paddingLeft = "5px";
     helperButton.style.paddingRight = "5px";
     helperButton.dataset.tjHelperInactiveClass = referenceButton.className;

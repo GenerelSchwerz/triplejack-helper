@@ -100,6 +100,7 @@
       outgoingRequestEvent: OUTGOING_REQUEST_EVENT,
       outgoingResponseEvent: OUTGOING_RESPONSE_EVENT,
       outgoingEnabledStorageKey: OUTGOING_ENABLED_STORAGE_KEY,
+      packetInterceptEvent: PACKET_INTERCEPT_EVENT,
       statusEvent: STATUS_EVENT,
     })});`;
 

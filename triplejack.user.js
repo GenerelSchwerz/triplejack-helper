@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Triplejack Helper
 // @namespace    https://triplejack.com/
-// @version      0.4.4
+// @version      0.5.0
 // @description  Translates Triplejack public chat and direct messages using Google Translate requests.
 // @author       Rocco A.
 // @license      MIT
@@ -49,6 +49,7 @@
   const RESPONSE_EVENT = "tj-helper-translate-response";
   const OUTGOING_REQUEST_EVENT = "tj-helper-outgoing-translate-request";
   const OUTGOING_RESPONSE_EVENT = "tj-helper-outgoing-translate-response";
+  const PACKET_INTERCEPT_EVENT = "tj-helper-websocket-packet";
   const STATUS_EVENT = "tj-helper-status";
   const pageWindow = typeof unsafeWindow === "undefined" ? window : unsafeWindow;
   const translationCache = new Map();
@@ -167,6 +168,7 @@
       outgoingRequestEvent: OUTGOING_REQUEST_EVENT,
       outgoingResponseEvent: OUTGOING_RESPONSE_EVENT,
       outgoingEnabledStorageKey: OUTGOING_ENABLED_STORAGE_KEY,
+      packetInterceptEvent: PACKET_INTERCEPT_EVENT,
       statusEvent: STATUS_EVENT,
     })});`;
 
@@ -182,6 +184,7 @@
     const pendingRequests = new Map();
     const pendingOutgoingRequests = new Map();
     const requestedPrivateMessageIds = new Set();
+    const redispatchedIncomingEvents = new WeakSet();
     const state = {
       hooked: false,
       sockets: 0,
@@ -222,11 +225,24 @@
           setStatus(`websocket opened: ${url}`);
 
           socket.addEventListener("message", (event) => {
-            handleIncomingWebSocketMessage(event, socket, socketId);
+            handleNativeIncomingWebSocketMessage(event, socket, socketId, String(url || ""));
           });
 
           const nativeSend = socket.send.bind(socket);
           socket.send = (data) => {
+            const interceptedPacket = interceptWebSocketPacket({
+              direction: "outgoing",
+              socketId,
+              url: String(url || ""),
+              data,
+            });
+            if (interceptedPacket.canceled) {
+              setStatus(`outgoing ${interceptedPacket.command || "packet"} canceled`);
+              return undefined;
+            }
+
+            data = interceptedPacket.data;
+
             if (!isOutgoingTranslationEnabled()) {
               return nativeSend(data);
             }
@@ -266,12 +282,89 @@
       setStatus("WebSocket hook installed in page context");
     }
 
-    function handleIncomingWebSocketMessage(event, socket, socketId) {
-      if (typeof event.data !== "string") {
+    function handleNativeIncomingWebSocketMessage(event, socket, socketId, url) {
+      if (redispatchedIncomingEvents.has(event)) {
         return;
       }
 
-      const chatMessages = parseTranslatableMessages(event.data);
+      const interceptedPacket = interceptWebSocketPacket({
+        direction: "incoming",
+        socketId,
+        url,
+        data: event.data,
+      });
+      if (interceptedPacket.canceled) {
+        event.stopImmediatePropagation();
+        setStatus(`incoming ${interceptedPacket.command || "packet"} canceled`);
+        return;
+      }
+
+      if (interceptedPacket.data !== event.data) {
+        event.stopImmediatePropagation();
+        const replacementEvent = cloneMessageEvent(event, interceptedPacket.data);
+        redispatchedIncomingEvents.add(replacementEvent);
+        socket.dispatchEvent(replacementEvent);
+        handleIncomingWebSocketMessage(interceptedPacket.data, socket, socketId);
+        return;
+      }
+
+      handleIncomingWebSocketMessage(event.data, socket, socketId);
+    }
+
+    function interceptWebSocketPacket(packet) {
+      const originalData = packet.data;
+      const detail = {
+        direction: packet.direction,
+        socketId: packet.socketId,
+        url: packet.url,
+        originalData,
+        data: packet.data,
+        command: getPacketCommand(packet.data),
+        modified: false,
+      };
+
+      const interceptEvent = new CustomEvent(config.packetInterceptEvent, {
+        cancelable: true,
+        detail,
+      });
+      document.dispatchEvent(interceptEvent);
+
+      detail.modified = detail.data !== originalData;
+      return {
+        ...detail,
+        canceled: interceptEvent.defaultPrevented,
+      };
+    }
+
+    function getPacketCommand(data) {
+      if (typeof data !== "string") {
+        return "";
+      }
+
+      const colonIndex = data.indexOf(":");
+      if (colonIndex === -1) {
+        return data.slice(0, 40);
+      }
+
+      return data.slice(0, colonIndex);
+    }
+
+    function cloneMessageEvent(event, data) {
+      return new MessageEvent("message", {
+        data,
+        origin: event.origin,
+        lastEventId: event.lastEventId,
+        source: event.source,
+        ports: event.ports,
+      });
+    }
+
+    function handleIncomingWebSocketMessage(data, socket, socketId) {
+      if (typeof data !== "string") {
+        return;
+      }
+
+      const chatMessages = parseTranslatableMessages(data);
       if (!chatMessages.length) {
         return;
       }

@@ -530,27 +530,23 @@
   }
 
   function deactivateHelperPanelSizingIfClosed() {
-    const panelContainer = document.querySelector('[data-testid="panel-container"]');
-    const panelRegion = panelContainer?.parentElement;
-    const hasVisiblePanel = Boolean(
-      panelContainer &&
-        panelRegion &&
-        panelContainer.dataset.tjHelperHiddenEmpty !== "1" &&
-        panelRegion.dataset.tjHelperHiddenEmpty !== "1" &&
-        panelRegion.offsetParent !== null,
-    );
-    if (state.activePanelId || getActiveNativePanelButton() || hasVisiblePanel) {
+    if (hasOpenPanel()) {
       return;
     }
 
     document.documentElement?.removeAttribute("data-tj-helper-panel-sizing-active");
     document.documentElement?.style.removeProperty("--tj-helper-panel-width");
+    clearNativeStageWidthStyle();
   }
 
   function prepareHelperPanelWidthBeforeOpen() {
     const panelWidth = getResolvedHelperPanelWidth();
     activateHelperPanelSizing(panelWidth);
     setNativeStageWidthStyle(panelWidth);
+  }
+
+  function hasOpenPanel() {
+    return Boolean(state.activePanelId || getActiveNativePanelButton());
   }
 
   function clearPanelWidthStyle(element) {
@@ -614,10 +610,11 @@
   function scheduleHelperPanelCloseCleanup() {
     const cleanup = () => {
       clearHelperPanelLayoutOverrides();
-      if (!state.activePanelId && !getActiveNativePanelButton()) {
+      if (!hasOpenPanel()) {
         removeEmptyHelperPanelRegion();
       }
       deactivateHelperPanelSizingIfClosed();
+      resizeNativeStageToContainer();
       window.dispatchEvent(new Event("resize"));
     };
 
@@ -650,6 +647,7 @@
       if (!state.activePanelId && !activeNativePanelButton && !panelContainer?.dataset.tjHelperPanelContainer) {
         clearHelperPanelLayoutOverrides(panelContainer);
         removeEmptyHelperPanelRegion();
+        deactivateHelperPanelSizingIfClosed();
         syncHelperPanelResizeHandle();
         resizeNativeStageToContainer();
         window.dispatchEvent(new Event("resize"));
@@ -815,7 +813,7 @@
   }
 
   function syncNativePanelGeometry() {
-    const panelContainer = document.querySelector('[data-testid="panel-container"]');
+    const panelContainer = hasOpenPanel() ? document.querySelector('[data-testid="panel-container"]') : null;
     const panelRegion = panelContainer?.parentElement;
     if (!panelContainer || !panelRegion) {
       return;

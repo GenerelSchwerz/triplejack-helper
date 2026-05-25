@@ -102,7 +102,7 @@
         ${renderHistoryMetric("Sessions", report.overall.sessions)}
         ${renderHistoryMetric("Net BB", formatHistorySigned(report.overall.bigBlindDelta), getHistoryStatColor(report.overall.bigBlindDelta))}
         ${renderHistoryMetric("BB/hour", `${formatHistorySigned(report.overall.bigBlindsPerHour)}/h`, getHistoryStatColor(report.overall.bigBlindDelta))}
-        ${renderHistoryMetric("Hours", (report.overall.durationMs / 3600000).toFixed(1))}
+        ${renderHistoryMetric("Time", formatHistoryDuration(report.overall.durationMs))}
       </div>
       <div style="${getHistorySplitGridStyle()}">
         <section style="${getHistorySectionStyle()}">
@@ -214,12 +214,20 @@
   }
 
   function formatHistoryDuration(durationMs) {
-    const minutes = Math.max(1, Math.round(durationMs / 60000));
-    if (minutes < 60) {
-      return `${minutes}m`;
+    const totalSeconds = Math.max(1, Math.round(durationMs / 1000));
+    if (totalSeconds < 60) {
+      return `${totalSeconds}s`;
     }
 
-    return `${(minutes / 60).toFixed(1)}h`;
+    const minutes = Math.floor(totalSeconds / 60);
+    const seconds = totalSeconds % 60;
+    if (minutes < 60) {
+      return seconds ? `${minutes}m ${seconds}s` : `${minutes}m`;
+    }
+
+    const hours = Math.floor(minutes / 60);
+    const remainingMinutes = minutes % 60;
+    return remainingMinutes ? `${hours}h ${remainingMinutes}m` : `${hours}h`;
   }
 
   function escapeHistoryHtml(value) {

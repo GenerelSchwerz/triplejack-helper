@@ -12,3 +12,7 @@ Open the raw `triplejack.user.js` file from this repository in your browser and 
 - Translates direct messages.
 - Optional translation for sent public chat and direct messages.
 - Configurable incoming and outgoing target languages.
+
+## License
+
+MIT

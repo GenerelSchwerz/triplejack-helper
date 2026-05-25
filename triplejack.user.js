@@ -1,9 +1,12 @@
 // ==UserScript==
 // @name         Triplejack Helper
 // @namespace    https://triplejack.com/
-// @version      0.2.0
-// @description  Adds automatic chat translation to triplejack.com.
+// @version      0.3.0
+// @description  Adds public chat and direct message translation tools to triplejack.com.
 // @author       Rocco A.
+// @license      MIT
+// @homepageURL  https://github.com/GenerelSchwerz/triplejack-helper
+// @supportURL   https://github.com/GenerelSchwerz/triplejack-helper/issues
 // @match        http://triplejack.com/*
 // @match        https://triplejack.com/*
 // @match        http://www.triplejack.com/*

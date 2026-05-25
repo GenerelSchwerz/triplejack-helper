@@ -4,6 +4,7 @@
   let nativePanelAsideClassName = "";
   let pendingHelperPanelOpenId = 0;
   let helperShellNativeButton = null;
+  let helperPanelSizingStyle = null;
 
   function isHelperPanelActive(panelId) {
     return state.activePanelId === panelId;
@@ -50,6 +51,7 @@
       nativeTitle: shellButton.title || "",
       nativeAriaLabel: shellButton.getAttribute("aria-label") || "",
     });
+    prepareHelperPanelWidthBeforeOpen();
     dispatchNativePanelPointerDown(shellButton);
     waitForNativePanelOpen(shellButton, () => {
       helperShellNativeButton = getActiveNativePanelButton() || shellButton;
@@ -257,6 +259,7 @@
     }
 
     const panelWidth = getResolvedHelperPanelWidth();
+    activateHelperPanelSizing(panelWidth);
     const panelRegion = document.createElement("div");
     panelRegion.dataset.tjHelperPanelRegion = "1";
     panelRegion.style.cssText = [
@@ -409,6 +412,7 @@
       clearHelperPanelWidth(panelContainer);
       clearNativeStageWidthStyle();
       if (panelContainer.dataset.tjHelperPanelContainer || panelRegion.dataset.tjHelperPanelRegion) {
+        activateHelperPanelSizing(HELPER_PANEL_WIDTH);
         setPanelRegionWidthStyle(panelRegion, HELPER_PANEL_WIDTH);
         setPanelContainerWidthStyle(panelContainer, HELPER_PANEL_WIDTH);
         setNativeStageWidthStyle(HELPER_PANEL_WIDTH);
@@ -418,6 +422,7 @@
     }
 
     const panelWidth = getResolvedHelperPanelWidth();
+    activateHelperPanelSizing(panelWidth);
     setNativeStageWidthStyle(panelWidth);
     setPanelRegionWidthStyle(panelRegion, panelWidth);
     setPanelContainerWidthStyle(panelContainer, panelWidth);
@@ -484,6 +489,70 @@
     return getHelperPanelWidthEnabled() ? getHelperPanelWidth() : HELPER_PANEL_WIDTH;
   }
 
+  function ensureHelperPanelSizingStyle() {
+    if (helperPanelSizingStyle?.isConnected) {
+      return helperPanelSizingStyle;
+    }
+
+    helperPanelSizingStyle = document.createElement("style");
+    helperPanelSizingStyle.dataset.tjHelperPanelSizingStyle = "1";
+    helperPanelSizingStyle.textContent = `
+      :root[data-tj-helper-panel-sizing-active="1"] [data-testid="poker-stage-container"] {
+        flex:1 1 0 !important;
+        flex-basis:0 !important;
+        width:calc(100% - var(--tj-helper-panel-width, ${HELPER_PANEL_WIDTH}px)) !important;
+        min-width:0 !important;
+        max-width:calc(100% - var(--tj-helper-panel-width, ${HELPER_PANEL_WIDTH}px)) !important;
+        overflow:hidden !important;
+      }
+      :root[data-tj-helper-panel-sizing-active="1"] [data-testid="poker-stage-container"] + *:has([data-testid="panel-container"]) {
+        flex:0 0 var(--tj-helper-panel-width, ${HELPER_PANEL_WIDTH}px) !important;
+        flex-basis:var(--tj-helper-panel-width, ${HELPER_PANEL_WIDTH}px) !important;
+        width:var(--tj-helper-panel-width, ${HELPER_PANEL_WIDTH}px) !important;
+        min-width:var(--tj-helper-panel-width, ${HELPER_PANEL_WIDTH}px) !important;
+        max-width:min(var(--tj-helper-panel-width, ${HELPER_PANEL_WIDTH}px), calc(100vw - 64px)) !important;
+      }
+      :root[data-tj-helper-panel-sizing-active="1"] [data-testid="poker-stage-container"] + *:has([data-testid="panel-container"]) > [data-testid="panel-container"] {
+        width:var(--tj-helper-panel-width, ${HELPER_PANEL_WIDTH}px) !important;
+        min-width:var(--tj-helper-panel-width, ${HELPER_PANEL_WIDTH}px) !important;
+        max-width:min(var(--tj-helper-panel-width, ${HELPER_PANEL_WIDTH}px), calc(100vw - 64px)) !important;
+      }
+    `;
+    document.head?.appendChild(helperPanelSizingStyle);
+    return helperPanelSizingStyle;
+  }
+
+  function activateHelperPanelSizing(panelWidth = getResolvedHelperPanelWidth()) {
+    const resolvedWidth = clampHelperPanelWidth(panelWidth);
+    document.documentElement?.style.setProperty("--tj-helper-panel-width", `${resolvedWidth}px`);
+    document.documentElement?.dataset && (document.documentElement.dataset.tjHelperPanelSizingActive = "1");
+    ensureHelperPanelSizingStyle();
+  }
+
+  function deactivateHelperPanelSizingIfClosed() {
+    const panelContainer = document.querySelector('[data-testid="panel-container"]');
+    const panelRegion = panelContainer?.parentElement;
+    const hasVisiblePanel = Boolean(
+      panelContainer &&
+        panelRegion &&
+        panelContainer.dataset.tjHelperHiddenEmpty !== "1" &&
+        panelRegion.dataset.tjHelperHiddenEmpty !== "1" &&
+        panelRegion.offsetParent !== null,
+    );
+    if (state.activePanelId || getActiveNativePanelButton() || hasVisiblePanel) {
+      return;
+    }
+
+    document.documentElement?.removeAttribute("data-tj-helper-panel-sizing-active");
+    document.documentElement?.style.removeProperty("--tj-helper-panel-width");
+  }
+
+  function prepareHelperPanelWidthBeforeOpen() {
+    const panelWidth = getResolvedHelperPanelWidth();
+    activateHelperPanelSizing(panelWidth);
+    setNativeStageWidthStyle(panelWidth);
+  }
+
   function clearPanelWidthStyle(element) {
     if (!element?.style) {
       return;
@@ -548,6 +617,7 @@
       if (!state.activePanelId && !getActiveNativePanelButton()) {
         removeEmptyHelperPanelRegion();
       }
+      deactivateHelperPanelSizingIfClosed();
       window.dispatchEvent(new Event("resize"));
     };
 
@@ -574,6 +644,7 @@
 
   function scheduleNativePanelWidthApply() {
     const refresh = () => {
+      prepareHelperPanelWidthBeforeOpen();
       const panelContainer = document.querySelector('[data-testid="panel-container"]');
       const activeNativePanelButton = getActiveNativePanelButton();
       if (!state.activePanelId && !activeNativePanelButton && !panelContainer?.dataset.tjHelperPanelContainer) {
@@ -619,6 +690,7 @@
     }
 
     ensureHelperPanelResizeHandle();
+    prepareHelperPanelWidthBeforeOpen();
     scheduleNativePanelWidthApply();
 
     if (!state.activePanelId) {

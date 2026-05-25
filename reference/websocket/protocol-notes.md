@@ -504,7 +504,7 @@ Feature use:
 ### `newbomb`
 
 ```text
-newbomb:<itemKey>,<targetSeat>,<unknown>,<x1>,<y1>,<x2>,<y2>,<physics...>,<flags...>,<effectId>
+newbomb:<itemKey>,<sourceOrActorSeat>,<targetSeat>,<x1>,<y1>,<x2>,<y2>,<physics...>,<flags...>,<effectId>
 ```
 
 Animation/effect payload for a thrown item. Observed fields include decimal coordinates and physics-like values:
@@ -516,7 +516,7 @@ newbomb:pie,1,-1,225.0,220.0,300.0,110.0,<angleOrVelocity>,<scaleOrVelocity>,<ro
 
 Because the payload starts with an item key, this appears to be the generic thrown-item animation frame even when the command name says `newbomb`.
 
-Correction from targeted replay testing: the first numeric field after item key appears to be the target seat. Earlier notes treated the following `-1` field as the likely target, but changing that field did not change the target. Rewriting the first numeric field does.
+Targeted replay testing indicates this is the packet that must be replayed for target changes. The companion `bomb:` frame carries item/source activity but does not carry the target seat. When replaying, preserve the first numeric field and rewrite the second numeric field after the item key.
 
 Feature use:
 

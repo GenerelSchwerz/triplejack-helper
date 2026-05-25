@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Triplejack Helper
 // @namespace    https://triplejack.com/
-// @version      0.8.23
+// @version      0.8.24
 // @description  Adds Triplejack chat translation, message tools, and session tracking helpers.
 // @author       Rocco A.
 // @license      MIT
@@ -641,6 +641,14 @@
         return;
       }
 
+      if (!detail.data.startsWith("newbomb:")) {
+        state.lastItemKey = itemKey;
+        state.nativeSend = detail.nativeSend;
+        state.socketId = detail.socketId || "";
+        setStatus(`quick bomb saw ${itemKey}; waiting for target packet`);
+        return;
+      }
+
       state.lastPacket = detail.data;
       state.lastItemKey = itemKey;
       state.nativeSend = detail.nativeSend;
@@ -806,11 +814,11 @@
       }
 
       const fields = splitProtocolFields(state.lastPacket.slice("newbomb:".length));
-      if (fields.length < 2) {
+      if (fields.length < 3) {
         return state.lastPacket;
       }
 
-      fields[1] = String(state.selectedTarget.seat);
+      fields[2] = String(state.selectedTarget.seat);
       return `newbomb:${fields.join(",")}`;
     }
 

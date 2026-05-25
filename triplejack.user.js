@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Triplejack Helper
 // @namespace    https://triplejack.com/
-// @version      0.8.24
+// @version      0.8.25
 // @description  Adds Triplejack chat translation, message tools, and session tracking helpers.
 // @author       Rocco A.
 // @license      MIT
@@ -629,6 +629,7 @@
 
       if (detail.direction === "incoming") {
         updateAmmoCosts(detail.data);
+        saveIncomingBombTemplate(detail.data);
         return;
       }
 
@@ -653,6 +654,21 @@
       state.lastItemKey = itemKey;
       state.nativeSend = detail.nativeSend;
       state.socketId = detail.socketId || "";
+      setStatus(`quick bomb saved ${itemKey}`);
+    }
+
+    function saveIncomingBombTemplate(data) {
+      if (!data.startsWith("newbomb:")) {
+        return;
+      }
+
+      const itemKey = getBombItemKey(data);
+      if (!itemKey) {
+        return;
+      }
+
+      state.lastPacket = data;
+      state.lastItemKey = itemKey;
       setStatus(`quick bomb saved ${itemKey}`);
     }
 

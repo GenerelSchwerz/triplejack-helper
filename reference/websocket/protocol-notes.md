@@ -516,7 +516,7 @@ newbomb:pie,1,-1,225.0,220.0,300.0,110.0,<angleOrVelocity>,<scaleOrVelocity>,<ro
 
 Because the payload starts with an item key, this appears to be the generic thrown-item animation frame even when the command name says `newbomb`.
 
-Targeted replay testing indicates this is the packet that must be replayed for target changes. The companion `bomb:` frame carries item/source activity but does not carry the target seat. When replaying, preserve the first numeric field and rewrite the second numeric field after the item key.
+Targeted replay testing indicates this is the packet that must be replayed for target changes. The companion `bomb:` frame carries item/source activity but does not carry the target seat. `bomb:` can be outgoing while the corresponding `newbomb:` animation packet is observed incoming immediately afterward. When replaying, preserve the first numeric field and rewrite the second numeric field after the item key.
 
 Feature use:
 

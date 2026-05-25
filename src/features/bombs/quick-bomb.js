@@ -32,6 +32,7 @@
 
       if (detail.direction === "incoming") {
         updateAmmoCosts(detail.data);
+        saveIncomingBombTemplate(detail.data);
         return;
       }
 
@@ -56,6 +57,21 @@
       state.lastItemKey = itemKey;
       state.nativeSend = detail.nativeSend;
       state.socketId = detail.socketId || "";
+      setStatus(`quick bomb saved ${itemKey}`);
+    }
+
+    function saveIncomingBombTemplate(data) {
+      if (!data.startsWith("newbomb:")) {
+        return;
+      }
+
+      const itemKey = getBombItemKey(data);
+      if (!itemKey) {
+        return;
+      }
+
+      state.lastPacket = data;
+      state.lastItemKey = itemKey;
       setStatus(`quick bomb saved ${itemKey}`);
     }
 

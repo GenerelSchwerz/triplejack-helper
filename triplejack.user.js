@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Triplejack Helper
 // @namespace    https://triplejack.com/
-// @version      0.5.5
+// @version      0.5.6
 // @description  Translates Triplejack public chat and direct messages using Google Translate requests.
 // @author       Rocco A.
 // @license      MIT
@@ -1329,10 +1329,10 @@
   };
 
   function installSessionTracker() {
-    document.addEventListener(SOCKET_MESSAGE_EVENT, handleSessionPacket);
+    document.addEventListener(SOCKET_MESSAGE_EVENT, handleSessionSocketMessage);
   }
 
-  function handleSessionPacket(event) {
+  function handleSessionSocketMessage(event) {
     const detail = event.detail;
     if (detail?.direction !== "incoming" || typeof detail.data !== "string") {
       return;

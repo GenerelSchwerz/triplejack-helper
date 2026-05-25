@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Triplejack Helper
 // @namespace    https://triplejack.com/
-// @version      0.8.14
+// @version      0.8.15
 // @description  Adds Triplejack chat translation, message tools, and session tracking helpers.
 // @author       Rocco A.
 // @license      MIT
@@ -34,11 +34,26 @@
   const SESSION_SUMMARY_STORAGE_KEY = "triplejack-helper-session-summary-enabled";
   const SESSION_HISTORY_STORAGE_KEY = "triplejack-helper-session-history";
   const QUICK_BOMB_ENABLED_STORAGE_KEY = "triplejack-helper-quick-bomb-enabled";
+  const QUICK_BOMB_RATE_STORAGE_KEY = "triplejack-helper-quick-bomb-rate";
+  const QUICK_BOMB_SPEED_MODE_STORAGE_KEY = "triplejack-helper-quick-bomb-speed-mode";
+  const QUICK_BOMB_MODE_STORAGE_KEY = "triplejack-helper-quick-bomb-mode";
+  const QUICK_BOMB_DURATION_STORAGE_KEY = "triplejack-helper-quick-bomb-duration";
+  const QUICK_BOMB_AMMO_STORAGE_KEY = "triplejack-helper-quick-bomb-ammo";
   const HELPER_PANEL_WIDTH_STORAGE_KEY = "triplejack-helper-panel-width";
   const HELPER_PANEL_WIDTH_ENABLED_STORAGE_KEY = "triplejack-helper-panel-width-enabled";
   const PANEL_TOGGLE_KEY = "L";
   const LANGUAGE_PROMPT_KEY = "Y";
   const QUICK_BOMB_KEY = "B";
+  const QUICK_BOMB_CONTROL_EVENT = "tj-helper-quick-bomb-control";
+  const QUICK_BOMB_DEFAULT_RATE = 8;
+  const QUICK_BOMB_MIN_RATE = 1;
+  const QUICK_BOMB_MAX_RATE = 30;
+  const QUICK_BOMB_DEFAULT_DURATION_SECONDS = 3;
+  const QUICK_BOMB_MIN_DURATION_SECONDS = 1;
+  const QUICK_BOMB_MAX_DURATION_SECONDS = 30;
+  const QUICK_BOMB_DEFAULT_AMMO = 20;
+  const QUICK_BOMB_MIN_AMMO = 1;
+  const QUICK_BOMB_MAX_AMMO = 300;
   const LANGUAGE_OPTIONS = [
     ["en", "English"],
     ["es", "Spanish"],
@@ -74,6 +89,8 @@
     activePanelId: "",
     quickBombLastItem: "",
     quickBombReplayCount: 0,
+    quickBombActive: false,
+    quickBombRemaining: 0,
   };
   let statusPanel;
   let sessionSummaryPanel;
@@ -587,10 +604,15 @@
       socketId: "",
       replayCount: 0,
       lastReplayAt: 0,
+      active: false,
+      runSent: 0,
+      targetSends: 0,
+      timerId: 0,
     };
 
     function install() {
       document.addEventListener(config.socketMessageEvent, handleSocketMessage);
+      document.addEventListener(config.controlEvent, handleControl);
       document.addEventListener("keydown", handleKeyDown, true);
     }
 
@@ -620,10 +642,36 @@
       event.preventDefault();
       event.stopPropagation();
       event.stopImmediatePropagation?.();
-      replayLastBomb();
+      toggleSpam();
     }
 
-    function replayLastBomb() {
+    function handleControl(event) {
+      const action = event.detail?.action;
+      if (action === "start") {
+        startSpam();
+        return;
+      }
+
+      if (action === "stop") {
+        stopSpam("quick bomb stopped");
+        return;
+      }
+
+      if (action === "toggle") {
+        toggleSpam();
+      }
+    }
+
+    function toggleSpam() {
+      if (state.active) {
+        stopSpam("quick bomb stopped");
+        return;
+      }
+
+      startSpam();
+    }
+
+    function startSpam() {
       if (!isQuickBombEnabled()) {
         setStatus("quick bomb disabled");
         return;
@@ -634,10 +682,89 @@
         return;
       }
 
+      stopTimer();
+      state.active = true;
+      state.runSent = 0;
+      state.targetSends = getTargetSends();
+      setStatus(`quick bomb started ${state.lastItemKey}`);
+      if (getSpeedMode() === "instant") {
+        sendInstantBombs();
+        return;
+      }
+
+      sendNextBomb();
+    }
+
+    function sendInstantBombs() {
+      while (state.active && state.runSent < state.targetSends) {
+        state.nativeSend(state.lastPacket);
+        state.runSent += 1;
+        state.replayCount += 1;
+        state.lastReplayAt = Date.now();
+      }
+
+      stopSpam(`quick bomb finished ${state.runSent}`);
+    }
+
+    function sendNextBomb() {
+      if (!state.active) {
+        return;
+      }
+
+      if (!isQuickBombEnabled()) {
+        stopSpam("quick bomb disabled");
+        return;
+      }
+
+      if (!state.lastPacket || typeof state.nativeSend !== "function") {
+        stopSpam("quick bomb lost socket");
+        return;
+      }
+
+      if (state.runSent >= state.targetSends) {
+        stopSpam(`quick bomb finished ${state.runSent}`);
+        return;
+      }
+
       state.nativeSend(state.lastPacket);
+      state.runSent += 1;
       state.replayCount += 1;
       state.lastReplayAt = Date.now();
       setStatus(`quick bomb threw ${state.lastItemKey}`);
+
+      if (state.runSent >= state.targetSends) {
+        stopSpam(`quick bomb finished ${state.runSent}`);
+        return;
+      }
+
+      state.timerId = window.setTimeout(sendNextBomb, getIntervalMs());
+    }
+
+    function stopSpam(status) {
+      stopTimer();
+      state.active = false;
+      setStatus(status);
+    }
+
+    function stopTimer() {
+      if (!state.timerId) {
+        return;
+      }
+
+      window.clearTimeout(state.timerId);
+      state.timerId = 0;
+    }
+
+    function getTargetSends() {
+      if (getMode() === "ammo") {
+        return getAmmo();
+      }
+
+      return Math.max(1, getRate() * getDurationSeconds());
+    }
+
+    function getIntervalMs() {
+      return Math.max(1, Math.round(1000 / getRate()));
     }
 
     function getBombItemKey(data) {
@@ -659,6 +786,50 @@
       return window.localStorage?.getItem(config.enabledStorageKey) !== "0";
     }
 
+    function getRate() {
+      return clampNumber(
+        window.localStorage?.getItem(config.rateStorageKey) || config.defaultRate,
+        config.minRate,
+        config.maxRate,
+        config.defaultRate,
+      );
+    }
+
+    function getMode() {
+      return window.localStorage?.getItem(config.modeStorageKey) === "ammo" ? "ammo" : "duration";
+    }
+
+    function getSpeedMode() {
+      return window.localStorage?.getItem(config.speedModeStorageKey) === "instant" ? "instant" : "timed";
+    }
+
+    function getDurationSeconds() {
+      return clampNumber(
+        window.localStorage?.getItem(config.durationStorageKey) || config.defaultDurationSeconds,
+        config.minDurationSeconds,
+        config.maxDurationSeconds,
+        config.defaultDurationSeconds,
+      );
+    }
+
+    function getAmmo() {
+      return clampNumber(
+        window.localStorage?.getItem(config.ammoStorageKey) || config.defaultAmmo,
+        config.minAmmo,
+        config.maxAmmo,
+        config.defaultAmmo,
+      );
+    }
+
+    function clampNumber(value, min, max, fallback) {
+      const numericValue = Number(value);
+      if (!Number.isFinite(numericValue)) {
+        return fallback;
+      }
+
+      return Math.min(max, Math.max(min, Math.round(numericValue)));
+    }
+
     function setStatus(status) {
       document.dispatchEvent(
         new CustomEvent(config.statusEvent, {
@@ -667,6 +838,8 @@
             quickBombReplayCount: state.replayCount,
             quickBombSocketId: state.socketId,
             quickBombLastReplayAt: state.lastReplayAt,
+            quickBombActive: state.active,
+            quickBombRemaining: state.active ? Math.max(0, state.targetSends - state.runSent) : 0,
             lastStatus: status,
           },
         }),
@@ -1025,8 +1198,23 @@
       const quickBombController = (${quickBombControllerModule.toString()})(${JSON.stringify({
       socketMessageEvent: SOCKET_MESSAGE_EVENT,
       statusEvent: STATUS_EVENT,
+      controlEvent: QUICK_BOMB_CONTROL_EVENT,
       enabledStorageKey: QUICK_BOMB_ENABLED_STORAGE_KEY,
+      rateStorageKey: QUICK_BOMB_RATE_STORAGE_KEY,
+      speedModeStorageKey: QUICK_BOMB_SPEED_MODE_STORAGE_KEY,
+      modeStorageKey: QUICK_BOMB_MODE_STORAGE_KEY,
+      durationStorageKey: QUICK_BOMB_DURATION_STORAGE_KEY,
+      ammoStorageKey: QUICK_BOMB_AMMO_STORAGE_KEY,
       hotkey: QUICK_BOMB_KEY,
+      defaultRate: QUICK_BOMB_DEFAULT_RATE,
+      minRate: QUICK_BOMB_MIN_RATE,
+      maxRate: QUICK_BOMB_MAX_RATE,
+      defaultDurationSeconds: QUICK_BOMB_DEFAULT_DURATION_SECONDS,
+      minDurationSeconds: QUICK_BOMB_MIN_DURATION_SECONDS,
+      maxDurationSeconds: QUICK_BOMB_MAX_DURATION_SECONDS,
+      defaultAmmo: QUICK_BOMB_DEFAULT_AMMO,
+      minAmmo: QUICK_BOMB_MIN_AMMO,
+      maxAmmo: QUICK_BOMB_MAX_AMMO,
     })});
       translationController.install();
       quickBombController.install();
@@ -2036,6 +2224,42 @@
     return localStorage.getItem(QUICK_BOMB_ENABLED_STORAGE_KEY) !== "0";
   }
 
+  function getQuickBombRate() {
+    return clampNumber(
+      localStorage.getItem(QUICK_BOMB_RATE_STORAGE_KEY) || QUICK_BOMB_DEFAULT_RATE,
+      QUICK_BOMB_MIN_RATE,
+      QUICK_BOMB_MAX_RATE,
+      QUICK_BOMB_DEFAULT_RATE,
+    );
+  }
+
+  function getQuickBombSpeedMode() {
+    return localStorage.getItem(QUICK_BOMB_SPEED_MODE_STORAGE_KEY) === "instant" ? "instant" : "timed";
+  }
+
+  function getQuickBombMode() {
+    const mode = localStorage.getItem(QUICK_BOMB_MODE_STORAGE_KEY);
+    return mode === "ammo" ? "ammo" : "duration";
+  }
+
+  function getQuickBombDuration() {
+    return clampNumber(
+      localStorage.getItem(QUICK_BOMB_DURATION_STORAGE_KEY) || QUICK_BOMB_DEFAULT_DURATION_SECONDS,
+      QUICK_BOMB_MIN_DURATION_SECONDS,
+      QUICK_BOMB_MAX_DURATION_SECONDS,
+      QUICK_BOMB_DEFAULT_DURATION_SECONDS,
+    );
+  }
+
+  function getQuickBombAmmo() {
+    return clampNumber(
+      localStorage.getItem(QUICK_BOMB_AMMO_STORAGE_KEY) || QUICK_BOMB_DEFAULT_AMMO,
+      QUICK_BOMB_MIN_AMMO,
+      QUICK_BOMB_MAX_AMMO,
+      QUICK_BOMB_DEFAULT_AMMO,
+    );
+  }
+
   function getHelperPanelWidth() {
     return clampHelperPanelWidth(localStorage.getItem(HELPER_PANEL_WIDTH_STORAGE_KEY) || HELPER_PANEL_WIDTH);
   }
@@ -2098,6 +2322,54 @@
     renderStatusPanel();
   }
 
+  function setQuickBombRate(rate) {
+    const value = clampNumber(rate, QUICK_BOMB_MIN_RATE, QUICK_BOMB_MAX_RATE, QUICK_BOMB_DEFAULT_RATE);
+    localStorage.setItem(QUICK_BOMB_RATE_STORAGE_KEY, String(value));
+    setStatus(`quick bomb rate set to ${value}/s`);
+    renderStatusPanel();
+  }
+
+  function setQuickBombSpeedMode(mode) {
+    const value = mode === "instant" ? "instant" : "timed";
+    localStorage.setItem(QUICK_BOMB_SPEED_MODE_STORAGE_KEY, value);
+    setStatus(`quick bomb speed set to ${value}`);
+    renderStatusPanel();
+  }
+
+  function setQuickBombMode(mode) {
+    const value = mode === "ammo" ? "ammo" : "duration";
+    localStorage.setItem(QUICK_BOMB_MODE_STORAGE_KEY, value);
+    setStatus(`quick bomb mode set to ${value}`);
+    renderStatusPanel();
+  }
+
+  function setQuickBombDuration(durationSeconds) {
+    const value = clampNumber(
+      durationSeconds,
+      QUICK_BOMB_MIN_DURATION_SECONDS,
+      QUICK_BOMB_MAX_DURATION_SECONDS,
+      QUICK_BOMB_DEFAULT_DURATION_SECONDS,
+    );
+    localStorage.setItem(QUICK_BOMB_DURATION_STORAGE_KEY, String(value));
+    setStatus(`quick bomb duration set to ${value}s`);
+    renderStatusPanel();
+  }
+
+  function setQuickBombAmmo(ammo) {
+    const value = clampNumber(ammo, QUICK_BOMB_MIN_AMMO, QUICK_BOMB_MAX_AMMO, QUICK_BOMB_DEFAULT_AMMO);
+    localStorage.setItem(QUICK_BOMB_AMMO_STORAGE_KEY, String(value));
+    setStatus(`quick bomb ammo set to ${value}`);
+    renderStatusPanel();
+  }
+
+  function sendQuickBombControl(action) {
+    document.dispatchEvent(
+      new CustomEvent(QUICK_BOMB_CONTROL_EVENT, {
+        detail: { action },
+      }),
+    );
+  }
+
   function setHelperPanelWidth(width, options = {}) {
     const panelWidth = clampHelperPanelWidth(width);
     localStorage.setItem(HELPER_PANEL_WIDTH_STORAGE_KEY, String(panelWidth));
@@ -2121,12 +2393,16 @@
   }
 
   function clampHelperPanelWidth(width) {
-    const numericWidth = Number(width);
-    if (!Number.isFinite(numericWidth)) {
-      return HELPER_PANEL_WIDTH;
+    return clampNumber(width, HELPER_PANEL_MIN_WIDTH, HELPER_PANEL_MAX_WIDTH, HELPER_PANEL_WIDTH);
+  }
+
+  function clampNumber(value, min, max, fallback) {
+    const numericValue = Number(value);
+    if (!Number.isFinite(numericValue)) {
+      return fallback;
     }
 
-    return Math.min(HELPER_PANEL_MAX_WIDTH, Math.max(HELPER_PANEL_MIN_WIDTH, Math.round(numericWidth)));
+    return Math.min(max, Math.max(min, Math.round(numericValue)));
   }
 
   function normalizeLanguageCode(language) {
@@ -4429,9 +4705,31 @@
           <section style="border:1px solid rgba(191,231,241,.2);border-radius:6px;padding:10px;background:rgba(255,255,255,.025);">
             <div style="margin-bottom:8px;color:#E9F7FA;font-weight:700;">Quick Bomb</div>
             <label style="display:flex;align-items:center;justify-content:space-between;gap:12px;color:#BFE7F1;">
-              <span>Replay last bomb</span>
+              <span>Bomb spammer</span>
               <input data-tj-helper-quick-bomb-enabled type="checkbox" style="margin:0;" />
             </label>
+            <div style="display:grid;grid-template-columns:minmax(0,1fr) 68px;gap:6px;align-items:center;margin-top:8px;color:#BFE7F1;">
+              <label>Per second</label>
+              <input data-tj-helper-quick-bomb-rate type="number" min="${QUICK_BOMB_MIN_RATE}" max="${QUICK_BOMB_MAX_RATE}" step="1" style="min-width:0;background:#DDEAF2;color:#111;border:1px solid #74A7B9;border-radius:4px;padding:4px;" />
+              <label>Speed</label>
+              <select data-tj-helper-quick-bomb-speed-mode style="min-width:0;background:#DDEAF2;color:#111;border:1px solid #74A7B9;border-radius:4px;padding:4px;">
+                <option value="timed">Timed</option>
+                <option value="instant">Instant</option>
+              </select>
+              <label>Limit</label>
+              <select data-tj-helper-quick-bomb-mode style="min-width:0;background:#DDEAF2;color:#111;border:1px solid #74A7B9;border-radius:4px;padding:4px;">
+                <option value="duration">Duration</option>
+                <option value="ammo">Ammo</option>
+              </select>
+              <label data-tj-helper-quick-bomb-duration-label>Seconds</label>
+              <input data-tj-helper-quick-bomb-duration type="number" min="${QUICK_BOMB_MIN_DURATION_SECONDS}" max="${QUICK_BOMB_MAX_DURATION_SECONDS}" step="1" style="min-width:0;background:#DDEAF2;color:#111;border:1px solid #74A7B9;border-radius:4px;padding:4px;" />
+              <label data-tj-helper-quick-bomb-ammo-label>Ammo</label>
+              <input data-tj-helper-quick-bomb-ammo type="number" min="${QUICK_BOMB_MIN_AMMO}" max="${QUICK_BOMB_MAX_AMMO}" step="1" style="min-width:0;background:#DDEAF2;color:#111;border:1px solid #74A7B9;border-radius:4px;padding:4px;" />
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:8px;">
+              <button data-tj-helper-quick-bomb-start type="button" style="background:#7ED6C4;color:#0B1B20;border:0;border-radius:4px;padding:5px 8px;font-weight:700;">Start</button>
+              <button data-tj-helper-quick-bomb-stop type="button" style="background:#DDEAF2;color:#0B1B20;border:0;border-radius:4px;padding:5px 8px;font-weight:700;">Stop</button>
+            </div>
             <div data-tj-helper-quick-bomb-status style="margin-top:6px;color:#8FB8C4;font-size:11px;"></div>
           </section>
           <section style="border:1px solid rgba(191,231,241,.2);border-radius:6px;padding:10px;background:rgba(255,255,255,.025);">
@@ -4472,6 +4770,13 @@
       const customOutgoingLanguageInput = statusPanel.querySelector("[data-tj-helper-custom-outgoing-language]");
       const messageTimestampsInput = statusPanel.querySelector("[data-tj-helper-message-timestamps-enabled]");
       const quickBombInput = statusPanel.querySelector("[data-tj-helper-quick-bomb-enabled]");
+      const quickBombRateInput = statusPanel.querySelector("[data-tj-helper-quick-bomb-rate]");
+      const quickBombSpeedModeSelect = statusPanel.querySelector("[data-tj-helper-quick-bomb-speed-mode]");
+      const quickBombModeSelect = statusPanel.querySelector("[data-tj-helper-quick-bomb-mode]");
+      const quickBombDurationInput = statusPanel.querySelector("[data-tj-helper-quick-bomb-duration]");
+      const quickBombAmmoInput = statusPanel.querySelector("[data-tj-helper-quick-bomb-ammo]");
+      const quickBombStartButton = statusPanel.querySelector("[data-tj-helper-quick-bomb-start]");
+      const quickBombStopButton = statusPanel.querySelector("[data-tj-helper-quick-bomb-stop]");
       const sessionSummaryInput = statusPanel.querySelector("[data-tj-helper-session-summary-enabled]");
       const panelWidthEnabledInput = statusPanel.querySelector("[data-tj-helper-panel-width-enabled]");
       const panelWidthInput = statusPanel.querySelector("[data-tj-helper-panel-width]");
@@ -4517,6 +4822,34 @@
         setQuickBombEnabled(quickBombInput.checked);
       });
 
+      quickBombRateInput.addEventListener("change", () => {
+        setQuickBombRate(quickBombRateInput.value);
+      });
+
+      quickBombSpeedModeSelect.addEventListener("change", () => {
+        setQuickBombSpeedMode(quickBombSpeedModeSelect.value);
+      });
+
+      quickBombModeSelect.addEventListener("change", () => {
+        setQuickBombMode(quickBombModeSelect.value);
+      });
+
+      quickBombDurationInput.addEventListener("change", () => {
+        setQuickBombDuration(quickBombDurationInput.value);
+      });
+
+      quickBombAmmoInput.addEventListener("change", () => {
+        setQuickBombAmmo(quickBombAmmoInput.value);
+      });
+
+      quickBombStartButton.addEventListener("click", () => {
+        sendQuickBombControl("start");
+      });
+
+      quickBombStopButton.addEventListener("click", () => {
+        sendQuickBombControl("stop");
+      });
+
       sessionSummaryInput.addEventListener("change", () => {
         setSessionSummaryEnabled(sessionSummaryInput.checked);
       });
@@ -4547,6 +4880,15 @@
     const customOutgoingLanguageInput = statusPanel.querySelector("[data-tj-helper-custom-outgoing-language]");
     const messageTimestampsInput = statusPanel.querySelector("[data-tj-helper-message-timestamps-enabled]");
     const quickBombInput = statusPanel.querySelector("[data-tj-helper-quick-bomb-enabled]");
+    const quickBombRateInput = statusPanel.querySelector("[data-tj-helper-quick-bomb-rate]");
+    const quickBombSpeedModeSelect = statusPanel.querySelector("[data-tj-helper-quick-bomb-speed-mode]");
+    const quickBombModeSelect = statusPanel.querySelector("[data-tj-helper-quick-bomb-mode]");
+    const quickBombDurationInput = statusPanel.querySelector("[data-tj-helper-quick-bomb-duration]");
+    const quickBombAmmoInput = statusPanel.querySelector("[data-tj-helper-quick-bomb-ammo]");
+    const quickBombDurationLabel = statusPanel.querySelector("[data-tj-helper-quick-bomb-duration-label]");
+    const quickBombAmmoLabel = statusPanel.querySelector("[data-tj-helper-quick-bomb-ammo-label]");
+    const quickBombStartButton = statusPanel.querySelector("[data-tj-helper-quick-bomb-start]");
+    const quickBombStopButton = statusPanel.querySelector("[data-tj-helper-quick-bomb-stop]");
     const quickBombStatusElement = statusPanel.querySelector("[data-tj-helper-quick-bomb-status]");
     const sessionSummaryInput = statusPanel.querySelector("[data-tj-helper-session-summary-enabled]");
     const panelWidthEnabledInput = statusPanel.querySelector("[data-tj-helper-panel-width-enabled]");
@@ -4568,8 +4910,23 @@
     customOutgoingLanguageInput.value = outgoingTargetLanguage;
     messageTimestampsInput.checked = getMessageTimestampsEnabled();
     quickBombInput.checked = getQuickBombEnabled();
+    quickBombRateInput.value = String(getQuickBombRate());
+    quickBombSpeedModeSelect.value = getQuickBombSpeedMode();
+    quickBombModeSelect.value = getQuickBombMode();
+    quickBombDurationInput.value = String(getQuickBombDuration());
+    quickBombAmmoInput.value = String(getQuickBombAmmo());
+    quickBombDurationInput.style.display = getQuickBombMode() === "duration" ? "" : "none";
+    quickBombDurationLabel.style.display = getQuickBombMode() === "duration" ? "" : "none";
+    quickBombAmmoInput.style.display = getQuickBombMode() === "ammo" ? "" : "none";
+    quickBombAmmoLabel.style.display = getQuickBombMode() === "ammo" ? "" : "none";
+    quickBombStartButton.disabled = state.quickBombActive || !getQuickBombEnabled();
+    quickBombStopButton.disabled = !state.quickBombActive;
+    quickBombStartButton.style.opacity = quickBombStartButton.disabled ? ".5" : "1";
+    quickBombStopButton.style.opacity = quickBombStopButton.disabled ? ".5" : "1";
     quickBombStatusElement.textContent = state.quickBombLastItem
-      ? `Saved: ${state.quickBombLastItem} | replays ${state.quickBombReplayCount || 0}`
+      ? `Saved: ${state.quickBombLastItem} | sent ${state.quickBombReplayCount || 0}${
+          state.quickBombActive ? ` | remaining ${state.quickBombRemaining || 0}` : ""
+        }`
       : "No bomb saved yet.";
     sessionSummaryInput.checked = getSessionSummaryEnabled();
     panelWidthEnabledInput.checked = getHelperPanelWidthEnabled();

@@ -22,6 +22,42 @@
     return localStorage.getItem(QUICK_BOMB_ENABLED_STORAGE_KEY) !== "0";
   }
 
+  function getQuickBombRate() {
+    return clampNumber(
+      localStorage.getItem(QUICK_BOMB_RATE_STORAGE_KEY) || QUICK_BOMB_DEFAULT_RATE,
+      QUICK_BOMB_MIN_RATE,
+      QUICK_BOMB_MAX_RATE,
+      QUICK_BOMB_DEFAULT_RATE,
+    );
+  }
+
+  function getQuickBombSpeedMode() {
+    return localStorage.getItem(QUICK_BOMB_SPEED_MODE_STORAGE_KEY) === "instant" ? "instant" : "timed";
+  }
+
+  function getQuickBombMode() {
+    const mode = localStorage.getItem(QUICK_BOMB_MODE_STORAGE_KEY);
+    return mode === "ammo" ? "ammo" : "duration";
+  }
+
+  function getQuickBombDuration() {
+    return clampNumber(
+      localStorage.getItem(QUICK_BOMB_DURATION_STORAGE_KEY) || QUICK_BOMB_DEFAULT_DURATION_SECONDS,
+      QUICK_BOMB_MIN_DURATION_SECONDS,
+      QUICK_BOMB_MAX_DURATION_SECONDS,
+      QUICK_BOMB_DEFAULT_DURATION_SECONDS,
+    );
+  }
+
+  function getQuickBombAmmo() {
+    return clampNumber(
+      localStorage.getItem(QUICK_BOMB_AMMO_STORAGE_KEY) || QUICK_BOMB_DEFAULT_AMMO,
+      QUICK_BOMB_MIN_AMMO,
+      QUICK_BOMB_MAX_AMMO,
+      QUICK_BOMB_DEFAULT_AMMO,
+    );
+  }
+
   function getHelperPanelWidth() {
     return clampHelperPanelWidth(localStorage.getItem(HELPER_PANEL_WIDTH_STORAGE_KEY) || HELPER_PANEL_WIDTH);
   }
@@ -84,6 +120,54 @@
     renderStatusPanel();
   }
 
+  function setQuickBombRate(rate) {
+    const value = clampNumber(rate, QUICK_BOMB_MIN_RATE, QUICK_BOMB_MAX_RATE, QUICK_BOMB_DEFAULT_RATE);
+    localStorage.setItem(QUICK_BOMB_RATE_STORAGE_KEY, String(value));
+    setStatus(`quick bomb rate set to ${value}/s`);
+    renderStatusPanel();
+  }
+
+  function setQuickBombSpeedMode(mode) {
+    const value = mode === "instant" ? "instant" : "timed";
+    localStorage.setItem(QUICK_BOMB_SPEED_MODE_STORAGE_KEY, value);
+    setStatus(`quick bomb speed set to ${value}`);
+    renderStatusPanel();
+  }
+
+  function setQuickBombMode(mode) {
+    const value = mode === "ammo" ? "ammo" : "duration";
+    localStorage.setItem(QUICK_BOMB_MODE_STORAGE_KEY, value);
+    setStatus(`quick bomb mode set to ${value}`);
+    renderStatusPanel();
+  }
+
+  function setQuickBombDuration(durationSeconds) {
+    const value = clampNumber(
+      durationSeconds,
+      QUICK_BOMB_MIN_DURATION_SECONDS,
+      QUICK_BOMB_MAX_DURATION_SECONDS,
+      QUICK_BOMB_DEFAULT_DURATION_SECONDS,
+    );
+    localStorage.setItem(QUICK_BOMB_DURATION_STORAGE_KEY, String(value));
+    setStatus(`quick bomb duration set to ${value}s`);
+    renderStatusPanel();
+  }
+
+  function setQuickBombAmmo(ammo) {
+    const value = clampNumber(ammo, QUICK_BOMB_MIN_AMMO, QUICK_BOMB_MAX_AMMO, QUICK_BOMB_DEFAULT_AMMO);
+    localStorage.setItem(QUICK_BOMB_AMMO_STORAGE_KEY, String(value));
+    setStatus(`quick bomb ammo set to ${value}`);
+    renderStatusPanel();
+  }
+
+  function sendQuickBombControl(action) {
+    document.dispatchEvent(
+      new CustomEvent(QUICK_BOMB_CONTROL_EVENT, {
+        detail: { action },
+      }),
+    );
+  }
+
   function setHelperPanelWidth(width, options = {}) {
     const panelWidth = clampHelperPanelWidth(width);
     localStorage.setItem(HELPER_PANEL_WIDTH_STORAGE_KEY, String(panelWidth));
@@ -107,12 +191,16 @@
   }
 
   function clampHelperPanelWidth(width) {
-    const numericWidth = Number(width);
-    if (!Number.isFinite(numericWidth)) {
-      return HELPER_PANEL_WIDTH;
+    return clampNumber(width, HELPER_PANEL_MIN_WIDTH, HELPER_PANEL_MAX_WIDTH, HELPER_PANEL_WIDTH);
+  }
+
+  function clampNumber(value, min, max, fallback) {
+    const numericValue = Number(value);
+    if (!Number.isFinite(numericValue)) {
+      return fallback;
     }
 
-    return Math.min(HELPER_PANEL_MAX_WIDTH, Math.max(HELPER_PANEL_MIN_WIDTH, Math.round(numericWidth)));
+    return Math.min(max, Math.max(min, Math.round(numericValue)));
   }
 
   function normalizeLanguageCode(language) {

@@ -7,11 +7,26 @@
   const SESSION_SUMMARY_STORAGE_KEY = "triplejack-helper-session-summary-enabled";
   const SESSION_HISTORY_STORAGE_KEY = "triplejack-helper-session-history";
   const QUICK_BOMB_ENABLED_STORAGE_KEY = "triplejack-helper-quick-bomb-enabled";
+  const QUICK_BOMB_RATE_STORAGE_KEY = "triplejack-helper-quick-bomb-rate";
+  const QUICK_BOMB_SPEED_MODE_STORAGE_KEY = "triplejack-helper-quick-bomb-speed-mode";
+  const QUICK_BOMB_MODE_STORAGE_KEY = "triplejack-helper-quick-bomb-mode";
+  const QUICK_BOMB_DURATION_STORAGE_KEY = "triplejack-helper-quick-bomb-duration";
+  const QUICK_BOMB_AMMO_STORAGE_KEY = "triplejack-helper-quick-bomb-ammo";
   const HELPER_PANEL_WIDTH_STORAGE_KEY = "triplejack-helper-panel-width";
   const HELPER_PANEL_WIDTH_ENABLED_STORAGE_KEY = "triplejack-helper-panel-width-enabled";
   const PANEL_TOGGLE_KEY = "L";
   const LANGUAGE_PROMPT_KEY = "Y";
   const QUICK_BOMB_KEY = "B";
+  const QUICK_BOMB_CONTROL_EVENT = "tj-helper-quick-bomb-control";
+  const QUICK_BOMB_DEFAULT_RATE = 8;
+  const QUICK_BOMB_MIN_RATE = 1;
+  const QUICK_BOMB_MAX_RATE = 30;
+  const QUICK_BOMB_DEFAULT_DURATION_SECONDS = 3;
+  const QUICK_BOMB_MIN_DURATION_SECONDS = 1;
+  const QUICK_BOMB_MAX_DURATION_SECONDS = 30;
+  const QUICK_BOMB_DEFAULT_AMMO = 20;
+  const QUICK_BOMB_MIN_AMMO = 1;
+  const QUICK_BOMB_MAX_AMMO = 300;
   const LANGUAGE_OPTIONS = [
     ["en", "English"],
     ["es", "Spanish"],
@@ -47,6 +62,8 @@
     activePanelId: "",
     quickBombLastItem: "",
     quickBombReplayCount: 0,
+    quickBombActive: false,
+    quickBombRemaining: 0,
   };
   let statusPanel;
   let sessionSummaryPanel;

@@ -117,8 +117,23 @@
       const quickBombController = (${quickBombControllerModule.toString()})(${JSON.stringify({
       socketMessageEvent: SOCKET_MESSAGE_EVENT,
       statusEvent: STATUS_EVENT,
+      controlEvent: QUICK_BOMB_CONTROL_EVENT,
       enabledStorageKey: QUICK_BOMB_ENABLED_STORAGE_KEY,
+      rateStorageKey: QUICK_BOMB_RATE_STORAGE_KEY,
+      speedModeStorageKey: QUICK_BOMB_SPEED_MODE_STORAGE_KEY,
+      modeStorageKey: QUICK_BOMB_MODE_STORAGE_KEY,
+      durationStorageKey: QUICK_BOMB_DURATION_STORAGE_KEY,
+      ammoStorageKey: QUICK_BOMB_AMMO_STORAGE_KEY,
       hotkey: QUICK_BOMB_KEY,
+      defaultRate: QUICK_BOMB_DEFAULT_RATE,
+      minRate: QUICK_BOMB_MIN_RATE,
+      maxRate: QUICK_BOMB_MAX_RATE,
+      defaultDurationSeconds: QUICK_BOMB_DEFAULT_DURATION_SECONDS,
+      minDurationSeconds: QUICK_BOMB_MIN_DURATION_SECONDS,
+      maxDurationSeconds: QUICK_BOMB_MAX_DURATION_SECONDS,
+      defaultAmmo: QUICK_BOMB_DEFAULT_AMMO,
+      minAmmo: QUICK_BOMB_MIN_AMMO,
+      maxAmmo: QUICK_BOMB_MAX_AMMO,
     })});
       translationController.install();
       quickBombController.install();

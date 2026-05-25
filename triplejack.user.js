@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Triplejack Helper
 // @namespace    https://triplejack.com/
-// @version      0.4.2
+// @version      0.4.3
 // @description  Translates Triplejack public chat and direct messages using Google Translate requests.
 // @author       Rocco A.
 // @license      MIT
@@ -868,6 +868,7 @@
 
     if (!getMessageTimestampsEnabled()) {
       for (const timestampElement of document.querySelectorAll("[data-tj-helper-timestamp]")) {
+        delete timestampElement.parentElement?.dataset.tjHelperTimestampValue;
         timestampElement.remove();
       }
       return;
@@ -875,6 +876,7 @@
 
     for (const timestampElement of document.querySelectorAll("[data-tj-helper-timestamp]")) {
       if (!isTimestampMessageElement(timestampElement.parentElement)) {
+        delete timestampElement.parentElement?.dataset.tjHelperTimestampValue;
         timestampElement.remove();
       }
     }
@@ -903,15 +905,13 @@
   function getTimestampMessageElements() {
     const messageElements = new Set();
     const selectors = [
-      '[aria-label="chat messages"] .scaling-panel-contents',
-      '[aria-label="chat messages"] font[color="#003366"]',
-      '[aria-label="chat messages"] font[color="#444444"]',
+      '[aria-label="chat messages"] .MuiTypography-root.MuiTypography-body1',
+      'aside[aria-label="active conversation panel"] .scaling-panel-contents',
     ];
 
     for (const element of document.querySelectorAll(selectors.join(","))) {
-      const messageElement = element.tagName.toLowerCase() === "font" ? element.parentElement : element;
-      if (isTimestampMessageElement(messageElement)) {
-        messageElements.add(messageElement);
+      if (isTimestampMessageElement(element)) {
+        messageElements.add(element);
       }
     }
 
@@ -923,11 +923,11 @@
       return false;
     }
 
-    if (!element.closest('[aria-label="chat messages"]')) {
+    if (element.closest("[data-tj-helper-toolbar-button]")) {
       return false;
     }
 
-    if (element.closest("[data-tj-helper-toolbar-button]")) {
+    if (element.matches("button,input,select,textarea")) {
       return false;
     }
 
@@ -939,11 +939,20 @@
       return false;
     }
 
-    if (element.querySelector("textarea,input,button,[title='Send Chat']")) {
+    if (element.querySelector("textarea,input,button,[data-testid='message input'],.MuiTextField-root,.MuiFormControl-root")) {
       return false;
     }
 
-    if (element.matches("button,input,select,textarea")) {
+    const messageTextElement = element.matches(".MuiTypography-root.MuiTypography-body1")
+      ? element
+      : element.querySelector(".MuiTypography-root.MuiTypography-body1");
+    if (!messageTextElement) {
+      return false;
+    }
+
+    const isPublicChatMessage = Boolean(element.closest('[aria-label="chat messages"]'));
+    const isPrivateMessage = Boolean(element.closest('aside[aria-label="active conversation panel"]'));
+    if (!isPublicChatMessage && !isPrivateMessage) {
       return false;
     }
 

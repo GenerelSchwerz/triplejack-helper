@@ -1,7 +1,7 @@
 ﻿// ==UserScript==
 // @name         Triplejack Helper
 // @namespace    https://triplejack.com/
-// @version      0.6.7
+// @version      0.6.8
 // @description  Translates Triplejack public chat and direct messages using Google Translate requests.
 // @author       Rocco A.
 // @license      MIT

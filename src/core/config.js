@@ -29,6 +29,7 @@
   const SOCKET_MESSAGE_EVENT = "tj-helper-websocket-message";
   const STATUS_EVENT = "tj-helper-status";
   const HELPER_PANEL_WIDTH = 390;
+  const PANEL_DEBUG_LOG_PREFIX = "[Triplejack Helper panels]";
   const pageWindow = typeof unsafeWindow === "undefined" ? window : unsafeWindow;
   const translationCache = new Map();
   const state = {
@@ -45,3 +46,7 @@
   let helperPanelHost;
   let timestampObserver;
   let timestampRenderQueued = false;
+
+  function logPanelDebug(action, details = {}) {
+    console.debug(PANEL_DEBUG_LOG_PREFIX, action, details);
+  }

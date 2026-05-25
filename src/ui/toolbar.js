@@ -83,6 +83,13 @@
       return;
     }
 
+    logPanelDebug("helper-toolbar-click-captured", {
+      panelId: helperButton.dataset.tjHelperToolbarButton,
+      activePanelId: state.activePanelId,
+      eventPhase: event.eventPhase,
+      targetTagName: event.target?.tagName || "",
+      targetTitle: event.target?.title || "",
+    });
     event.preventDefault();
     event.stopPropagation();
     event.stopImmediatePropagation?.();

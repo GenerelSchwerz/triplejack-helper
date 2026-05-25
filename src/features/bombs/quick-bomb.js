@@ -49,7 +49,7 @@
         state.lastItemKey = itemKey;
         state.nativeSend = detail.nativeSend;
         state.socketId = detail.socketId || "";
-        setStatus(`quick bomb saw ${itemKey}; waiting for target packet`);
+        setStatus(`quick bomb threw ${itemKey}; waiting for newbomb template`);
         return;
       }
 
@@ -127,7 +127,7 @@
         setStatus(
           state.lastPacket
             ? "quick bomb needs an outgoing bomb send first"
-            : "quick bomb needs an incoming newbomb template",
+            : `quick bomb needs incoming newbomb template for ${state.lastItemKey}`,
         );
         return;
       }

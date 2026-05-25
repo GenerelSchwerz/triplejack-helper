@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Triplejack Helper
 // @namespace    https://triplejack.com/
-// @version      0.6.20
+// @version      0.6.21
 // @description  Adds Triplejack chat translation, message tools, and session tracking helpers.
 // @author       Rocco A.
 // @license      MIT
@@ -2172,8 +2172,8 @@
   }
 
   function renderHistoryTrendGraph(report) {
-    const periods = report.periods || [];
-    if (!periods.length) {
+    const sessions = report.sessions || [];
+    if (!sessions.length) {
       return "";
     }
 
@@ -2221,12 +2221,15 @@
     }
 
     let cumulativeBigBlinds = 0;
-    const chartPoints = (report.periods || []).map((period) => {
-      cumulativeBigBlinds += Number(period.bigBlindDelta) || 0;
+    const chronologicalSessions = (report.sessions || []).slice().sort((a, b) => a.endedAt - b.endedAt);
+    const chartPoints = chronologicalSessions.map((session, index) => {
+      cumulativeBigBlinds += Number(session.bigBlindDelta) || 0;
       return {
-        label: period.periodLabel,
-        netBigBlinds: Number(period.bigBlindDelta) || 0,
-        bbPerHour: Number.isFinite(Number(period.bigBlindsPerHour)) ? Number(period.bigBlindsPerHour) : null,
+        x: normalizeHistoryChartTime(session.endedAt, chronologicalSessions, index),
+        label: formatHistoryDateTime(session.endedAt),
+        endedAt: session.endedAt,
+        netBigBlinds: Number(session.bigBlindDelta) || 0,
+        bbPerHour: Number.isFinite(Number(session.bigBlindsPerHour)) ? Number(session.bigBlindsPerHour) : null,
         cumulativeBigBlinds,
       };
     });
@@ -2239,11 +2242,17 @@
     sessionHistoryChart = new ChartConstructor(chartElement, {
       type: "line",
       data: {
-        labels: chartPoints.map((point) => point.label),
         datasets: [
           {
             label: chartMode.label,
-            data: chartPoints.map((point) => point[chartMode.valueKey]),
+            data: chartPoints.map((point) => {
+              return {
+                x: point.x,
+                y: point[chartMode.valueKey],
+                label: point.label,
+                endedAt: point.endedAt,
+              };
+            }),
             borderColor: chartMode.color,
             backgroundColor: chartMode.fillColor,
             borderWidth: 2,
@@ -2288,6 +2297,9 @@
           },
           tooltip: {
             callbacks: {
+              title(context) {
+                return context[0]?.raw?.label || "";
+              },
               label(context) {
                 return `${context.dataset.label}: ${formatHistoryChartValue(context.parsed.y, chartMode)}`;
               },
@@ -2296,13 +2308,16 @@
         },
         scales: {
           x: {
+            type: "linear",
+            min: 0,
+            max: 1,
             ticks: {
               color: "#8FB8C4",
               maxRotation: 0,
               autoSkip: true,
               maxTicksLimit: 5,
               callback(value) {
-                return formatHistoryChartTickLabel(this.getLabelForValue(value));
+                return formatHistoryChartTimeTick(value, chartPoints);
               },
             },
             grid: {
@@ -2507,6 +2522,31 @@
   function formatHistoryChartTickLabel(label) {
     const text = String(label || "");
     return text.length > 12 ? `${text.slice(0, 11)}...` : text;
+  }
+
+  function formatHistoryChartTimeTick(value, chartPoints) {
+    if (!chartPoints.length) {
+      return "";
+    }
+
+    const closestPoint = chartPoints.reduce((closest, point) => {
+      return Math.abs(point.x - value) < Math.abs(closest.x - value) ? point : closest;
+    }, chartPoints[0]);
+    return formatHistoryChartTickLabel(closestPoint.label);
+  }
+
+  function normalizeHistoryChartTime(timestamp, sessions, index) {
+    if (sessions.length < 2) {
+      return 0.5;
+    }
+
+    const firstTime = sessions[0].endedAt;
+    const lastTime = sessions[sessions.length - 1].endedAt;
+    if (firstTime === lastTime) {
+      return sessions.length === 1 ? 0.5 : index / (sessions.length - 1);
+    }
+
+    return (timestamp - firstTime) / (lastTime - firstTime);
   }
 
   function getChartConstructor() {

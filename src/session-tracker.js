@@ -9,6 +9,7 @@
     bigBlind: null,
     startStack: null,
     endStack: null,
+    finalStackSeen: false,
     startedAt: 0,
     lastUpdateAt: 0,
   };
@@ -49,7 +50,7 @@
     }
 
     if (command === "last_chip_stack") {
-      updateSessionStack(toNumberOrNull(detail.data.slice("last_chip_stack:".length)));
+      updateSessionStack(toNumberOrNull(detail.data.slice("last_chip_stack:".length)), null, { final: true });
       return;
     }
 
@@ -125,6 +126,7 @@
       bigBlind: null,
       startStack: null,
       endStack: null,
+      finalStackSeen: false,
       startedAt: 0,
       lastUpdateAt: 0,
     });
@@ -207,8 +209,12 @@
     }
   }
 
-  function updateSessionStack(stack, committedAmount = null) {
+  function updateSessionStack(stack, committedAmount = null, options = {}) {
     if (stack === null) {
+      return;
+    }
+
+    if (sessionTracker.finalStackSeen && !options.final) {
       return;
     }
 
@@ -217,6 +223,7 @@
     }
 
     sessionTracker.endStack = stack;
+    sessionTracker.finalStackSeen = Boolean(options.final);
     sessionTracker.lastUpdateAt = Date.now();
   }
 

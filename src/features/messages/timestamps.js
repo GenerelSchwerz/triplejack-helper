@@ -57,20 +57,14 @@
         continue;
       }
 
+      const timestampTarget = getTimestampRenderTarget(messageElement);
       const timestampElement = document.createElement("span");
       timestampElement.dataset.tjHelperTimestamp = "1";
       timestampElement.dataset.tjHelperTimestampSource = getTimestampSource(messageElement);
       timestampElement.textContent = timestampText;
-      timestampElement.style.cssText = [
-        "display:inline-block",
-        "margin-left:6px",
-        "opacity:.68",
-        "font:10px/1 Arial,sans-serif",
-        "white-space:nowrap",
-        "vertical-align:baseline",
-      ].join(";");
+      timestampElement.style.cssText = getTimestampStyle(messageElement);
 
-      messageElement.appendChild(timestampElement);
+      timestampTarget.appendChild(timestampElement);
     }
   }
 
@@ -115,9 +109,7 @@
       return false;
     }
 
-    const messageTextElement = element.matches(".MuiTypography-root.MuiTypography-body1")
-      ? element
-      : element.querySelector(".MuiTypography-root.MuiTypography-body1");
+    const messageTextElement = getMessageTextElement(element);
     if (!messageTextElement) {
       return false;
     }
@@ -147,6 +139,48 @@
 
   function getTimestampSource(messageElement) {
     return messageElement.closest('aside[aria-label="active conversation panel"]') ? "private-protocol" : "current";
+  }
+
+  function getTimestampRenderTarget(messageElement) {
+    if (!messageElement.closest('aside[aria-label="active conversation panel"]')) {
+      return messageElement;
+    }
+
+    const messageTextElement = getMessageTextElement(messageElement);
+    const directBubble = Array.from(messageElement.children).find((child) => {
+      return child.contains(messageTextElement) && !child.matches("[data-tj-helper-timestamp]");
+    });
+
+    return directBubble || messageTextElement || messageElement;
+  }
+
+  function getTimestampStyle(messageElement) {
+    if (messageElement.closest('aside[aria-label="active conversation panel"]')) {
+      return [
+        "display:block",
+        "margin:3px 1px 0 auto",
+        "opacity:.58",
+        "font:9px/1 Arial,sans-serif",
+        "letter-spacing:0",
+        "white-space:nowrap",
+        "text-align:right",
+      ].join(";");
+    }
+
+    return [
+      "display:inline-block",
+      "margin-left:6px",
+      "opacity:.68",
+      "font:10px/1 Arial,sans-serif",
+      "white-space:nowrap",
+      "vertical-align:baseline",
+    ].join(";");
+  }
+
+  function getMessageTextElement(element) {
+    return element.matches?.(".MuiTypography-root.MuiTypography-body1")
+      ? element
+      : element.querySelector?.(".MuiTypography-root.MuiTypography-body1");
   }
 
   function isStalePrivateTimestampElement(timestampElement) {

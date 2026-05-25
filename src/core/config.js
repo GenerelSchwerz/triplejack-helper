@@ -61,6 +61,7 @@
     lastStatus: "starting",
     activePanelId: "",
     quickBombLastItem: "",
+    quickBombAmmoCost: 1,
     quickBombReplayCount: 0,
     quickBombActive: false,
     quickBombRemaining: 0,

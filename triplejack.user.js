@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Triplejack Helper
 // @namespace    https://triplejack.com/
-// @version      0.8.16
+// @version      0.8.17
 // @description  Adds Triplejack chat translation, message tools, and session tracking helpers.
 // @author       Rocco A.
 // @license      MIT
@@ -88,6 +88,7 @@
     lastStatus: "starting",
     activePanelId: "",
     quickBombLastItem: "",
+    quickBombAmmoCost: 1,
     quickBombReplayCount: 0,
     quickBombActive: false,
     quickBombRemaining: 0,
@@ -597,15 +598,12 @@
 
   // Quick bomb controller
   function quickBombControllerModule(config) {
-    const AMMO_COST_BY_ITEM_KEY = {
-      pie: 2,
-    };
-
     const state = {
       lastPacket: "",
       lastItemKey: "",
       nativeSend: null,
       socketId: "",
+      ammoCostByItemKey: new Map(),
       replayCount: 0,
       lastReplayAt: 0,
       active: false,
@@ -622,7 +620,16 @@
 
     function handleSocketMessage(event) {
       const detail = event.detail;
-      if (detail?.direction !== "outgoing" || typeof detail.data !== "string") {
+      if (!detail || typeof detail.data !== "string") {
+        return;
+      }
+
+      if (detail.direction === "incoming") {
+        updateAmmoCosts(detail.data);
+        return;
+      }
+
+      if (detail.direction !== "outgoing") {
         return;
       }
 
@@ -772,7 +779,88 @@
     }
 
     function getAmmoCost(itemKey) {
-      return AMMO_COST_BY_ITEM_KEY[String(itemKey || "").toLowerCase()] || 1;
+      return state.ammoCostByItemKey.get(normalizeItemKey(itemKey)) || 1;
+    }
+
+    function updateAmmoCosts(data) {
+      if (data.startsWith("inventory_defs:")) {
+        updateAmmoCostsFromInventoryDefs(data.slice("inventory_defs:".length));
+        return;
+      }
+
+      if (data.startsWith("bombs_init:")) {
+        updateAmmoCostsFromBombsInit(data.slice("bombs_init:".length));
+      }
+    }
+
+    function updateAmmoCostsFromInventoryDefs(payload) {
+      const groups = splitProtocolFields(stripOuterBraces(payload));
+      for (const group of groups) {
+        const groupFields = splitProtocolFields(stripOuterBraces(group));
+        if (groupFields[0] !== "BOMB") {
+          continue;
+        }
+
+        for (const itemDefinition of splitProtocolFields(stripOuterBraces(groupFields[1] || ""))) {
+          const itemFields = splitProtocolFields(stripOuterBraces(itemDefinition));
+          setAmmoCost(itemFields[0], itemFields[1]);
+        }
+      }
+    }
+
+    function updateAmmoCostsFromBombsInit(payload) {
+      for (const itemDefinition of splitProtocolFields(stripOuterBraces(payload))) {
+        const itemFields = splitProtocolFields(stripOuterBraces(itemDefinition));
+        setAmmoCost(itemFields[0], itemFields[5]);
+      }
+    }
+
+    function setAmmoCost(itemKey, cost) {
+      const normalizedItemKey = normalizeItemKey(itemKey);
+      const numericCost = Number(cost);
+      if (!normalizedItemKey || !Number.isFinite(numericCost) || numericCost <= 0) {
+        return;
+      }
+
+      state.ammoCostByItemKey.set(normalizedItemKey, Math.max(1, Math.round(numericCost)));
+    }
+
+    function normalizeItemKey(itemKey) {
+      return String(itemKey || "").trim().toLowerCase();
+    }
+
+    function stripOuterBraces(value) {
+      const text = String(value || "").trim();
+      if (text.startsWith("{") && text.endsWith("}")) {
+        return text.slice(1, -1);
+      }
+
+      return text;
+    }
+
+    function splitProtocolFields(value) {
+      const fields = [];
+      let depth = 0;
+      let fieldStart = 0;
+      const text = String(value || "");
+
+      for (let index = 0; index < text.length; index += 1) {
+        const character = text[index];
+        if (character === "{") {
+          depth += 1;
+        } else if (character === "}") {
+          depth = Math.max(0, depth - 1);
+        } else if (character === "," && depth === 0) {
+          fields.push(text.slice(fieldStart, index));
+          fieldStart = index + 1;
+        }
+      }
+
+      if (fieldStart <= text.length) {
+        fields.push(text.slice(fieldStart));
+      }
+
+      return fields;
     }
 
     function getIntervalMs() {
@@ -850,6 +938,7 @@
             quickBombReplayCount: state.replayCount,
             quickBombSocketId: state.socketId,
             quickBombLastReplayAt: state.lastReplayAt,
+            quickBombAmmoCost: getAmmoCost(state.lastItemKey),
             quickBombActive: state.active,
             quickBombRemaining: state.active ? Math.max(0, state.targetSends - state.runSent) : 0,
             lastStatus: status,
@@ -4936,7 +5025,7 @@
     quickBombStartButton.style.opacity = quickBombStartButton.disabled ? ".5" : "1";
     quickBombStopButton.style.opacity = quickBombStopButton.disabled ? ".5" : "1";
     quickBombStatusElement.textContent = state.quickBombLastItem
-      ? `Saved: ${state.quickBombLastItem} | sent ${state.quickBombReplayCount || 0}${
+      ? `Saved: ${state.quickBombLastItem} | cost ${state.quickBombAmmoCost || 1} | sent ${state.quickBombReplayCount || 0}${
           state.quickBombActive ? ` | remaining ${state.quickBombRemaining || 0}` : ""
         }`
       : "No bomb saved yet.";

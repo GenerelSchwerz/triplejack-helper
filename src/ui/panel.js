@@ -276,7 +276,7 @@
     quickBombStartButton.style.opacity = quickBombStartButton.disabled ? ".5" : "1";
     quickBombStopButton.style.opacity = quickBombStopButton.disabled ? ".5" : "1";
     quickBombStatusElement.textContent = state.quickBombLastItem
-      ? `Saved: ${state.quickBombLastItem} | sent ${state.quickBombReplayCount || 0}${
+      ? `Saved: ${state.quickBombLastItem} | cost ${state.quickBombAmmoCost || 1} | sent ${state.quickBombReplayCount || 0}${
           state.quickBombActive ? ` | remaining ${state.quickBombRemaining || 0}` : ""
         }`
       : "No bomb saved yet.";

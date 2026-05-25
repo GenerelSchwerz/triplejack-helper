@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Triplejack Helper
 // @namespace    https://triplejack.com/
-// @version      0.6.24
+// @version      0.6.25
 // @description  Adds Triplejack chat translation, message tools, and session tracking helpers.
 // @author       Rocco A.
 // @license      MIT
@@ -34,6 +34,7 @@
   const SESSION_SUMMARY_STORAGE_KEY = "triplejack-helper-session-summary-enabled";
   const SESSION_HISTORY_STORAGE_KEY = "triplejack-helper-session-history";
   const HELPER_PANEL_WIDTH_STORAGE_KEY = "triplejack-helper-panel-width";
+  const HELPER_PANEL_WIDTH_ENABLED_STORAGE_KEY = "triplejack-helper-panel-width-enabled";
   const PANEL_TOGGLE_KEY = "L";
   const LANGUAGE_PROMPT_KEY = "Y";
   const LANGUAGE_OPTIONS = [
@@ -1183,6 +1184,7 @@
       return null;
     }
 
+    const panelWidth = getResolvedHelperPanelWidth();
     const panelRegion = document.createElement("div");
     panelRegion.dataset.tjHelperPanelRegion = "1";
     panelRegion.style.cssText = [
@@ -1190,8 +1192,8 @@
       "min-width:0",
       "display:flex",
       "align-items:stretch",
-      `flex:0 1 ${HELPER_PANEL_WIDTH}px`,
-      `max-width:min(${HELPER_PANEL_WIDTH}px,calc(100vw - 64px))`,
+      `flex:0 1 ${panelWidth}px`,
+      `max-width:min(${panelWidth}px,calc(100vw - 64px))`,
     ].join(";");
 
     const panelContainer = document.createElement("div");
@@ -1267,6 +1269,7 @@
       window.removeEventListener("pointerup", stop, true);
       window.removeEventListener("pointercancel", stop, true);
       setStatus(`panel width set to ${panelWidth}px`);
+      refreshNativeLayoutAfterPanelWidthChange();
       renderStatusPanel();
     };
 
@@ -1282,12 +1285,83 @@
       return;
     }
 
-    const panelWidth = getHelperPanelWidth();
-    panelRegion.style.flex = `0 0 ${panelWidth}px`;
-    panelRegion.style.width = `${panelWidth}px`;
-    panelRegion.style.maxWidth = `min(${panelWidth}px,calc(100vw - 64px))`;
-    panelContainer.style.width = "100%";
+    if (!getHelperPanelWidthEnabled()) {
+      clearHelperPanelWidth(panelContainer);
+      if (panelContainer.dataset.tjHelperPanelContainer || panelRegion.dataset.tjHelperPanelRegion) {
+        setPanelWidthStyle(panelRegion, HELPER_PANEL_WIDTH);
+        setPanelWidthStyle(panelContainer, HELPER_PANEL_WIDTH);
+      }
+      scheduleLayoutRefresh();
+      return;
+    }
+
+    const panelWidth = getResolvedHelperPanelWidth();
+    setPanelWidthStyle(panelRegion, panelWidth);
+    setPanelWidthStyle(panelContainer, panelWidth);
+    for (const child of panelContainer.children) {
+      setPanelWidthStyle(child, panelWidth);
+    }
     scheduleLayoutRefresh();
+  }
+
+  function clearHelperPanelWidth(panelContainer = document.querySelector('[data-testid="panel-container"]')) {
+    const panelRegion = panelContainer?.parentElement;
+    clearPanelWidthStyle(panelRegion);
+    clearPanelWidthStyle(panelContainer);
+    if (panelContainer) {
+      for (const child of panelContainer.children) {
+        clearPanelWidthStyle(child);
+      }
+    }
+  }
+
+  function setPanelWidthStyle(element, panelWidth) {
+    if (!element?.style) {
+      return;
+    }
+
+    element.style.setProperty("flex", `0 0 ${panelWidth}px`, "important");
+    element.style.setProperty("flex-basis", `${panelWidth}px`, "important");
+    element.style.setProperty("width", `${panelWidth}px`, "important");
+    element.style.setProperty("min-width", `${panelWidth}px`, "important");
+    element.style.setProperty("max-width", `min(${panelWidth}px,calc(100vw - 64px))`, "important");
+  }
+
+  function getResolvedHelperPanelWidth() {
+    return getHelperPanelWidthEnabled() ? getHelperPanelWidth() : HELPER_PANEL_WIDTH;
+  }
+
+  function clearPanelWidthStyle(element) {
+    if (!element?.style) {
+      return;
+    }
+
+    for (const property of ["flex", "flex-basis", "width", "min-width", "max-width"]) {
+      element.style.removeProperty(property);
+    }
+  }
+
+  function refreshNativeLayoutAfterPanelWidthChange() {
+    applyHelperPanelWidth();
+    scheduleLayoutRefresh();
+    window.requestAnimationFrame(() => {
+      scheduleLayoutRefresh();
+    });
+    window.setTimeout(scheduleLayoutRefresh, 120);
+  }
+
+  function scheduleNativePanelWidthApply() {
+    const refresh = () => {
+      applyHelperPanelWidth();
+      scheduleLayoutRefresh();
+    };
+
+    window.requestAnimationFrame(refresh);
+    window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(refresh);
+    });
+    window.setTimeout(refresh, 80);
+    window.setTimeout(refresh, 250);
   }
 
   function captureNativePanelClasses(panelContainer) {
@@ -1307,6 +1381,8 @@
     if (!nativePanelButton || nativePanelButton.dataset.tjHelperToolbarButton) {
       return;
     }
+
+    scheduleNativePanelWidthApply();
 
     if (!state.activePanelId) {
       return;
@@ -1330,6 +1406,7 @@
       dispatchNativePanelPointerDown(nativePanelButton);
       window.requestAnimationFrame(() => {
         dispatchNativePanelPointerDown(nativePanelButton);
+        scheduleNativePanelWidthApply();
       });
       return;
     }
@@ -1461,6 +1538,15 @@
     return clampHelperPanelWidth(localStorage.getItem(HELPER_PANEL_WIDTH_STORAGE_KEY) || HELPER_PANEL_WIDTH);
   }
 
+  function getHelperPanelWidthEnabled() {
+    const storedValue = localStorage.getItem(HELPER_PANEL_WIDTH_ENABLED_STORAGE_KEY);
+    if (storedValue !== null) {
+      return storedValue === "1";
+    }
+
+    return localStorage.getItem(HELPER_PANEL_WIDTH_STORAGE_KEY) !== null;
+  }
+
   function setTargetLanguage(language) {
     const normalizedLanguage = normalizeLanguageCode(language);
     if (!/^[a-z]{2,3}(-[a-z0-9]{2,8})?$/i.test(normalizedLanguage)) {
@@ -1507,12 +1593,22 @@
   function setHelperPanelWidth(width, options = {}) {
     const panelWidth = clampHelperPanelWidth(width);
     localStorage.setItem(HELPER_PANEL_WIDTH_STORAGE_KEY, String(panelWidth));
+    if (options.enable !== false) {
+      localStorage.setItem(HELPER_PANEL_WIDTH_ENABLED_STORAGE_KEY, "1");
+    }
     applyHelperPanelWidth();
     if (options.silent) {
       return;
     }
 
     setStatus(`panel width set to ${panelWidth}px`);
+    renderStatusPanel();
+  }
+
+  function setHelperPanelWidthEnabled(enabled) {
+    localStorage.setItem(HELPER_PANEL_WIDTH_ENABLED_STORAGE_KEY, enabled ? "1" : "0");
+    refreshNativeLayoutAfterPanelWidthChange();
+    setStatus(`custom panel width ${enabled ? "enabled" : "disabled"}`);
     renderStatusPanel();
   }
 
@@ -3479,6 +3575,14 @@
               <input data-tj-helper-session-summary-enabled type="checkbox" style="margin:0;" />
             </label>
           </section>
+          <section style="border:1px solid rgba(191,231,241,.2);border-radius:6px;padding:10px;background:rgba(255,255,255,.025);">
+            <div style="margin-bottom:8px;color:#E9F7FA;font-weight:700;">Panel</div>
+            <label style="display:flex;align-items:center;justify-content:space-between;gap:12px;color:#BFE7F1;">
+              <span>Use custom panel width</span>
+              <input data-tj-helper-panel-width-enabled type="checkbox" style="margin:0;" />
+            </label>
+            <div data-tj-helper-panel-width-value style="margin-top:6px;color:#8FB8C4;font-size:11px;"></div>
+          </section>
           <div style="border-top:1px solid rgba(191,231,241,.22);padding-top:8px;">
             <div style="margin-bottom:6px;color:#E9F7FA;font-weight:700;">Status</div>
             <div data-tj-helper-stats style="color:#D6EEF5;"></div>
@@ -3494,6 +3598,7 @@
       const customOutgoingLanguageInput = statusPanel.querySelector("[data-tj-helper-custom-outgoing-language]");
       const messageTimestampsInput = statusPanel.querySelector("[data-tj-helper-message-timestamps-enabled]");
       const sessionSummaryInput = statusPanel.querySelector("[data-tj-helper-session-summary-enabled]");
+      const panelWidthEnabledInput = statusPanel.querySelector("[data-tj-helper-panel-width-enabled]");
 
       for (const [value, label] of LANGUAGE_OPTIONS) {
         const option = document.createElement("option");
@@ -3534,6 +3639,10 @@
       sessionSummaryInput.addEventListener("change", () => {
         setSessionSummaryEnabled(sessionSummaryInput.checked);
       });
+
+      panelWidthEnabledInput.addEventListener("change", () => {
+        setHelperPanelWidthEnabled(panelWidthEnabledInput.checked);
+      });
     }
 
     const targetLanguage = getTargetLanguage();
@@ -3545,6 +3654,8 @@
     const customOutgoingLanguageInput = statusPanel.querySelector("[data-tj-helper-custom-outgoing-language]");
     const messageTimestampsInput = statusPanel.querySelector("[data-tj-helper-message-timestamps-enabled]");
     const sessionSummaryInput = statusPanel.querySelector("[data-tj-helper-session-summary-enabled]");
+    const panelWidthEnabledInput = statusPanel.querySelector("[data-tj-helper-panel-width-enabled]");
+    const panelWidthValueElement = statusPanel.querySelector("[data-tj-helper-panel-width-value]");
     const statsElement = statusPanel.querySelector("[data-tj-helper-stats]");
     const statusElement = statusPanel.querySelector("[data-tj-helper-status]");
 
@@ -3561,6 +3672,8 @@
     customOutgoingLanguageInput.value = outgoingTargetLanguage;
     messageTimestampsInput.checked = getMessageTimestampsEnabled();
     sessionSummaryInput.checked = getSessionSummaryEnabled();
+    panelWidthEnabledInput.checked = getHelperPanelWidthEnabled();
+    panelWidthValueElement.textContent = `Current custom width: ${getHelperPanelWidth()}px`;
     statsElement.textContent = `${state.hooked ? "hooked" : "not hooked"} | sockets ${state.sockets}, messages ${state.chatsSeen}, translations ${state.translationsShown}`;
     statusElement.textContent = state.lastStatus;
 

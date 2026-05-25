@@ -22,6 +22,15 @@
     return clampHelperPanelWidth(localStorage.getItem(HELPER_PANEL_WIDTH_STORAGE_KEY) || HELPER_PANEL_WIDTH);
   }
 
+  function getHelperPanelWidthEnabled() {
+    const storedValue = localStorage.getItem(HELPER_PANEL_WIDTH_ENABLED_STORAGE_KEY);
+    if (storedValue !== null) {
+      return storedValue === "1";
+    }
+
+    return localStorage.getItem(HELPER_PANEL_WIDTH_STORAGE_KEY) !== null;
+  }
+
   function setTargetLanguage(language) {
     const normalizedLanguage = normalizeLanguageCode(language);
     if (!/^[a-z]{2,3}(-[a-z0-9]{2,8})?$/i.test(normalizedLanguage)) {
@@ -68,12 +77,22 @@
   function setHelperPanelWidth(width, options = {}) {
     const panelWidth = clampHelperPanelWidth(width);
     localStorage.setItem(HELPER_PANEL_WIDTH_STORAGE_KEY, String(panelWidth));
+    if (options.enable !== false) {
+      localStorage.setItem(HELPER_PANEL_WIDTH_ENABLED_STORAGE_KEY, "1");
+    }
     applyHelperPanelWidth();
     if (options.silent) {
       return;
     }
 
     setStatus(`panel width set to ${panelWidth}px`);
+    renderStatusPanel();
+  }
+
+  function setHelperPanelWidthEnabled(enabled) {
+    localStorage.setItem(HELPER_PANEL_WIDTH_ENABLED_STORAGE_KEY, enabled ? "1" : "0");
+    refreshNativeLayoutAfterPanelWidthChange();
+    setStatus(`custom panel width ${enabled ? "enabled" : "disabled"}`);
     renderStatusPanel();
   }
 

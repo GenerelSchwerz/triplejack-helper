@@ -250,6 +250,7 @@
       return null;
     }
 
+    const panelWidth = getResolvedHelperPanelWidth();
     const panelRegion = document.createElement("div");
     panelRegion.dataset.tjHelperPanelRegion = "1";
     panelRegion.style.cssText = [
@@ -257,8 +258,8 @@
       "min-width:0",
       "display:flex",
       "align-items:stretch",
-      `flex:0 1 ${HELPER_PANEL_WIDTH}px`,
-      `max-width:min(${HELPER_PANEL_WIDTH}px,calc(100vw - 64px))`,
+      `flex:0 1 ${panelWidth}px`,
+      `max-width:min(${panelWidth}px,calc(100vw - 64px))`,
     ].join(";");
 
     const panelContainer = document.createElement("div");
@@ -334,6 +335,7 @@
       window.removeEventListener("pointerup", stop, true);
       window.removeEventListener("pointercancel", stop, true);
       setStatus(`panel width set to ${panelWidth}px`);
+      refreshNativeLayoutAfterPanelWidthChange();
       renderStatusPanel();
     };
 
@@ -349,12 +351,83 @@
       return;
     }
 
-    const panelWidth = getHelperPanelWidth();
-    panelRegion.style.flex = `0 0 ${panelWidth}px`;
-    panelRegion.style.width = `${panelWidth}px`;
-    panelRegion.style.maxWidth = `min(${panelWidth}px,calc(100vw - 64px))`;
-    panelContainer.style.width = "100%";
+    if (!getHelperPanelWidthEnabled()) {
+      clearHelperPanelWidth(panelContainer);
+      if (panelContainer.dataset.tjHelperPanelContainer || panelRegion.dataset.tjHelperPanelRegion) {
+        setPanelWidthStyle(panelRegion, HELPER_PANEL_WIDTH);
+        setPanelWidthStyle(panelContainer, HELPER_PANEL_WIDTH);
+      }
+      scheduleLayoutRefresh();
+      return;
+    }
+
+    const panelWidth = getResolvedHelperPanelWidth();
+    setPanelWidthStyle(panelRegion, panelWidth);
+    setPanelWidthStyle(panelContainer, panelWidth);
+    for (const child of panelContainer.children) {
+      setPanelWidthStyle(child, panelWidth);
+    }
     scheduleLayoutRefresh();
+  }
+
+  function clearHelperPanelWidth(panelContainer = document.querySelector('[data-testid="panel-container"]')) {
+    const panelRegion = panelContainer?.parentElement;
+    clearPanelWidthStyle(panelRegion);
+    clearPanelWidthStyle(panelContainer);
+    if (panelContainer) {
+      for (const child of panelContainer.children) {
+        clearPanelWidthStyle(child);
+      }
+    }
+  }
+
+  function setPanelWidthStyle(element, panelWidth) {
+    if (!element?.style) {
+      return;
+    }
+
+    element.style.setProperty("flex", `0 0 ${panelWidth}px`, "important");
+    element.style.setProperty("flex-basis", `${panelWidth}px`, "important");
+    element.style.setProperty("width", `${panelWidth}px`, "important");
+    element.style.setProperty("min-width", `${panelWidth}px`, "important");
+    element.style.setProperty("max-width", `min(${panelWidth}px,calc(100vw - 64px))`, "important");
+  }
+
+  function getResolvedHelperPanelWidth() {
+    return getHelperPanelWidthEnabled() ? getHelperPanelWidth() : HELPER_PANEL_WIDTH;
+  }
+
+  function clearPanelWidthStyle(element) {
+    if (!element?.style) {
+      return;
+    }
+
+    for (const property of ["flex", "flex-basis", "width", "min-width", "max-width"]) {
+      element.style.removeProperty(property);
+    }
+  }
+
+  function refreshNativeLayoutAfterPanelWidthChange() {
+    applyHelperPanelWidth();
+    scheduleLayoutRefresh();
+    window.requestAnimationFrame(() => {
+      scheduleLayoutRefresh();
+    });
+    window.setTimeout(scheduleLayoutRefresh, 120);
+  }
+
+  function scheduleNativePanelWidthApply() {
+    const refresh = () => {
+      applyHelperPanelWidth();
+      scheduleLayoutRefresh();
+    };
+
+    window.requestAnimationFrame(refresh);
+    window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(refresh);
+    });
+    window.setTimeout(refresh, 80);
+    window.setTimeout(refresh, 250);
   }
 
   function captureNativePanelClasses(panelContainer) {
@@ -374,6 +447,8 @@
     if (!nativePanelButton || nativePanelButton.dataset.tjHelperToolbarButton) {
       return;
     }
+
+    scheduleNativePanelWidthApply();
 
     if (!state.activePanelId) {
       return;
@@ -397,6 +472,7 @@
       dispatchNativePanelPointerDown(nativePanelButton);
       window.requestAnimationFrame(() => {
         dispatchNativePanelPointerDown(nativePanelButton);
+        scheduleNativePanelWidthApply();
       });
       return;
     }

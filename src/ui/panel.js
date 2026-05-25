@@ -61,6 +61,14 @@
               <input data-tj-helper-session-summary-enabled type="checkbox" style="margin:0;" />
             </label>
           </section>
+          <section style="border:1px solid rgba(191,231,241,.2);border-radius:6px;padding:10px;background:rgba(255,255,255,.025);">
+            <div style="margin-bottom:8px;color:#E9F7FA;font-weight:700;">Panel</div>
+            <label style="display:flex;align-items:center;justify-content:space-between;gap:12px;color:#BFE7F1;">
+              <span>Use custom panel width</span>
+              <input data-tj-helper-panel-width-enabled type="checkbox" style="margin:0;" />
+            </label>
+            <div data-tj-helper-panel-width-value style="margin-top:6px;color:#8FB8C4;font-size:11px;"></div>
+          </section>
           <div style="border-top:1px solid rgba(191,231,241,.22);padding-top:8px;">
             <div style="margin-bottom:6px;color:#E9F7FA;font-weight:700;">Status</div>
             <div data-tj-helper-stats style="color:#D6EEF5;"></div>
@@ -76,6 +84,7 @@
       const customOutgoingLanguageInput = statusPanel.querySelector("[data-tj-helper-custom-outgoing-language]");
       const messageTimestampsInput = statusPanel.querySelector("[data-tj-helper-message-timestamps-enabled]");
       const sessionSummaryInput = statusPanel.querySelector("[data-tj-helper-session-summary-enabled]");
+      const panelWidthEnabledInput = statusPanel.querySelector("[data-tj-helper-panel-width-enabled]");
 
       for (const [value, label] of LANGUAGE_OPTIONS) {
         const option = document.createElement("option");
@@ -116,6 +125,10 @@
       sessionSummaryInput.addEventListener("change", () => {
         setSessionSummaryEnabled(sessionSummaryInput.checked);
       });
+
+      panelWidthEnabledInput.addEventListener("change", () => {
+        setHelperPanelWidthEnabled(panelWidthEnabledInput.checked);
+      });
     }
 
     const targetLanguage = getTargetLanguage();
@@ -127,6 +140,8 @@
     const customOutgoingLanguageInput = statusPanel.querySelector("[data-tj-helper-custom-outgoing-language]");
     const messageTimestampsInput = statusPanel.querySelector("[data-tj-helper-message-timestamps-enabled]");
     const sessionSummaryInput = statusPanel.querySelector("[data-tj-helper-session-summary-enabled]");
+    const panelWidthEnabledInput = statusPanel.querySelector("[data-tj-helper-panel-width-enabled]");
+    const panelWidthValueElement = statusPanel.querySelector("[data-tj-helper-panel-width-value]");
     const statsElement = statusPanel.querySelector("[data-tj-helper-stats]");
     const statusElement = statusPanel.querySelector("[data-tj-helper-status]");
 
@@ -143,6 +158,8 @@
     customOutgoingLanguageInput.value = outgoingTargetLanguage;
     messageTimestampsInput.checked = getMessageTimestampsEnabled();
     sessionSummaryInput.checked = getSessionSummaryEnabled();
+    panelWidthEnabledInput.checked = getHelperPanelWidthEnabled();
+    panelWidthValueElement.textContent = `Current custom width: ${getHelperPanelWidth()}px`;
     statsElement.textContent = `${state.hooked ? "hooked" : "not hooked"} | sockets ${state.sockets}, messages ${state.chatsSeen}, translations ${state.translationsShown}`;
     statusElement.textContent = state.lastStatus;
 

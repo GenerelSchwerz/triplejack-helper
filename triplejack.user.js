@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Triplejack Helper
 // @namespace    https://triplejack.com/
-// @version      0.3.5
+// @version      0.4.0
 // @description  Translates Triplejack public chat and direct messages using Google Translate requests.
 // @author       Rocco A.
 // @license      MIT
@@ -28,6 +28,7 @@
   const LANGUAGE_STORAGE_KEY = "triplejack-helper-target-language";
   const OUTGOING_LANGUAGE_STORAGE_KEY = "triplejack-helper-outgoing-language";
   const OUTGOING_ENABLED_STORAGE_KEY = "triplejack-helper-outgoing-enabled";
+  const MESSAGE_TIMESTAMPS_STORAGE_KEY = "triplejack-helper-message-timestamps-enabled";
   const PANEL_TOGGLE_KEY = "L";
   const LANGUAGE_PROMPT_KEY = "Y";
   const LANGUAGE_OPTIONS = [
@@ -59,6 +60,8 @@
     panelVisible: false,
   };
   let statusPanel;
+  let timestampObserver;
+  let timestampRenderQueued = false;
 
   function log(...args) {
     console.log(`[${SCRIPT_NAME}]`, ...args);
@@ -724,6 +727,10 @@
     return localStorage.getItem(OUTGOING_ENABLED_STORAGE_KEY) === "1";
   }
 
+  function getMessageTimestampsEnabled() {
+    return localStorage.getItem(MESSAGE_TIMESTAMPS_STORAGE_KEY) === "1";
+  }
+
   function setTargetLanguage(language) {
     const normalizedLanguage = normalizeLanguageCode(language);
     if (!/^[a-z]{2,3}(-[a-z0-9]{2,8})?$/i.test(normalizedLanguage)) {
@@ -751,6 +758,13 @@
   function setOutgoingTranslationEnabled(enabled) {
     localStorage.setItem(OUTGOING_ENABLED_STORAGE_KEY, enabled ? "1" : "0");
     setStatus(`outgoing translation ${enabled ? "enabled" : "disabled"}`);
+    renderStatusPanel();
+  }
+
+  function setMessageTimestampsEnabled(enabled) {
+    localStorage.setItem(MESSAGE_TIMESTAMPS_STORAGE_KEY, enabled ? "1" : "0");
+    setStatus(`message timestamps ${enabled ? "enabled" : "disabled"}`);
+    renderMessageTimestamps();
     renderStatusPanel();
   }
 
@@ -818,6 +832,117 @@
     for (const delay of [0, 250, 1000, 2500]) {
       window.setTimeout(renderToolbarButtons, delay);
     }
+  }
+
+  function installMessageTimestamps() {
+    timestampObserver = new MutationObserver(queueMessageTimestampRender);
+    timestampObserver.observe(document.documentElement, {
+      childList: true,
+      subtree: true,
+    });
+
+    document.addEventListener("DOMContentLoaded", renderMessageTimestamps, { once: true });
+    window.addEventListener("load", renderMessageTimestamps, { once: true });
+
+    for (const delay of [0, 250, 1000, 2500]) {
+      window.setTimeout(renderMessageTimestamps, delay);
+    }
+  }
+
+  function queueMessageTimestampRender() {
+    if (timestampRenderQueued) {
+      return;
+    }
+
+    timestampRenderQueued = true;
+    window.requestAnimationFrame(() => {
+      timestampRenderQueued = false;
+      renderMessageTimestamps();
+    });
+  }
+
+  function renderMessageTimestamps() {
+    if (!document.documentElement) {
+      return;
+    }
+
+    if (!getMessageTimestampsEnabled()) {
+      for (const timestampElement of document.querySelectorAll("[data-tj-helper-timestamp]")) {
+        timestampElement.remove();
+      }
+      return;
+    }
+
+    for (const messageElement of getTimestampMessageElements()) {
+      if (messageElement.querySelector("[data-tj-helper-timestamp]")) {
+        continue;
+      }
+
+      const timestampElement = document.createElement("span");
+      timestampElement.dataset.tjHelperTimestamp = "1";
+      timestampElement.textContent = getMessageTimestamp(messageElement);
+      timestampElement.style.cssText = [
+        "display:inline-block",
+        "margin-left:6px",
+        "opacity:.68",
+        "font:10px/1 Arial,sans-serif",
+        "white-space:nowrap",
+        "vertical-align:baseline",
+      ].join(";");
+
+      messageElement.appendChild(timestampElement);
+    }
+  }
+
+  function getTimestampMessageElements() {
+    const messageElements = new Set();
+    const selectors = [
+      'aside[aria-label="chat panel"] .scaling-panel-contents',
+      '[aria-label="chat messages"] .scaling-panel-contents',
+      '[data-testid="panel-container"] .scaling-panel-contents',
+      '[data-testid="panel-container"] font[color="#003366"]',
+      '[data-testid="panel-container"] font[color="#444444"]',
+    ];
+
+    for (const element of document.querySelectorAll(selectors.join(","))) {
+      const messageElement = element.tagName.toLowerCase() === "font" ? element.parentElement : element;
+      if (isTimestampMessageElement(messageElement)) {
+        messageElements.add(messageElement);
+      }
+    }
+
+    return messageElements;
+  }
+
+  function isTimestampMessageElement(element) {
+    if (!element || statusPanel?.contains(element)) {
+      return false;
+    }
+
+    if (element.closest("[data-tj-helper-toolbar-button]")) {
+      return false;
+    }
+
+    if (element.matches("button,input,select,textarea")) {
+      return false;
+    }
+
+    return Boolean(element.textContent?.trim());
+  }
+
+  function getMessageTimestamp(messageElement) {
+    if (!messageElement.dataset.tjHelperTimestampValue) {
+      messageElement.dataset.tjHelperTimestampValue = formatTimestamp(new Date());
+    }
+
+    return messageElement.dataset.tjHelperTimestampValue;
+  }
+
+  function formatTimestamp(date) {
+    return date.toLocaleTimeString([], {
+      hour: "numeric",
+      minute: "2-digit",
+    });
   }
 
   function renderToolbarButtons() {
@@ -951,21 +1076,35 @@
           <strong style="font-size:13px;">Triplejack Helper</strong>
           <button type="button" data-tj-helper-close style="border:0;background:#294655;color:#fff;border-radius:4px;padding:2px 7px;cursor:pointer;">x</button>
         </div>
-        <label style="display:block;margin-bottom:4px;color:#BFE7F1;">Target language</label>
-        <div style="display:flex;gap:6px;margin-bottom:8px;">
-          <select data-tj-helper-language style="flex:1;min-width:0;background:#DDEAF2;color:#111;border:1px solid #74A7B9;border-radius:4px;padding:4px;"></select>
-          <input data-tj-helper-custom-language style="width:62px;background:#DDEAF2;color:#111;border:1px solid #74A7B9;border-radius:4px;padding:4px;" />
+        <div style="margin-bottom:10px;border-top:1px solid rgba(191,231,241,.22);padding-top:8px;">
+          <div style="margin-bottom:6px;color:#E9F7FA;font-weight:700;">Translation</div>
+          <label style="display:block;margin-bottom:4px;color:#BFE7F1;">Incoming language</label>
+          <div style="display:flex;gap:6px;margin-bottom:8px;">
+            <select data-tj-helper-language style="flex:1;min-width:0;background:#DDEAF2;color:#111;border:1px solid #74A7B9;border-radius:4px;padding:4px;"></select>
+            <input data-tj-helper-custom-language style="width:62px;background:#DDEAF2;color:#111;border:1px solid #74A7B9;border-radius:4px;padding:4px;" />
+          </div>
+          <label style="display:flex;align-items:center;gap:6px;margin-bottom:6px;color:#BFE7F1;">
+            <input data-tj-helper-outgoing-enabled type="checkbox" style="margin:0;" />
+            Translate sent messages
+          </label>
+          <label style="display:block;margin-bottom:4px;color:#BFE7F1;">Outgoing language</label>
+          <div style="display:flex;gap:6px;">
+            <select data-tj-helper-outgoing-language style="flex:1;min-width:0;background:#DDEAF2;color:#111;border:1px solid #74A7B9;border-radius:4px;padding:4px;"></select>
+            <input data-tj-helper-custom-outgoing-language style="width:62px;background:#DDEAF2;color:#111;border:1px solid #74A7B9;border-radius:4px;padding:4px;" />
+          </div>
         </div>
-        <label style="display:flex;align-items:center;gap:6px;margin-bottom:6px;color:#BFE7F1;">
-          <input data-tj-helper-outgoing-enabled type="checkbox" style="margin:0;" />
-          Translate sent messages
-        </label>
-        <div style="display:flex;gap:6px;margin-bottom:8px;">
-          <select data-tj-helper-outgoing-language style="flex:1;min-width:0;background:#DDEAF2;color:#111;border:1px solid #74A7B9;border-radius:4px;padding:4px;"></select>
-          <input data-tj-helper-custom-outgoing-language style="width:62px;background:#DDEAF2;color:#111;border:1px solid #74A7B9;border-radius:4px;padding:4px;" />
+        <div style="margin-bottom:10px;border-top:1px solid rgba(191,231,241,.22);padding-top:8px;">
+          <div style="margin-bottom:6px;color:#E9F7FA;font-weight:700;">Messages</div>
+          <label style="display:flex;align-items:center;gap:6px;color:#BFE7F1;">
+            <input data-tj-helper-message-timestamps-enabled type="checkbox" style="margin:0;" />
+            Show timestamps
+          </label>
         </div>
-        <div data-tj-helper-stats style="color:#D6EEF5;"></div>
-        <div data-tj-helper-status style="margin-top:6px;color:#A7D8AD;"></div>
+        <div style="border-top:1px solid rgba(191,231,241,.22);padding-top:8px;">
+          <div style="margin-bottom:6px;color:#E9F7FA;font-weight:700;">Status</div>
+          <div data-tj-helper-stats style="color:#D6EEF5;"></div>
+          <div data-tj-helper-status style="margin-top:6px;color:#A7D8AD;"></div>
+        </div>
       `;
 
       const closeButton = statusPanel.querySelector("[data-tj-helper-close]");
@@ -974,6 +1113,7 @@
       const outgoingEnabledInput = statusPanel.querySelector("[data-tj-helper-outgoing-enabled]");
       const outgoingLanguageSelect = statusPanel.querySelector("[data-tj-helper-outgoing-language]");
       const customOutgoingLanguageInput = statusPanel.querySelector("[data-tj-helper-custom-outgoing-language]");
+      const messageTimestampsInput = statusPanel.querySelector("[data-tj-helper-message-timestamps-enabled]");
 
       for (const [value, label] of LANGUAGE_OPTIONS) {
         const option = document.createElement("option");
@@ -1011,6 +1151,10 @@
       customOutgoingLanguageInput.addEventListener("change", () => {
         setOutgoingTargetLanguage(customOutgoingLanguageInput.value);
       });
+
+      messageTimestampsInput.addEventListener("change", () => {
+        setMessageTimestampsEnabled(messageTimestampsInput.checked);
+      });
     }
 
     const targetLanguage = getTargetLanguage();
@@ -1020,6 +1164,7 @@
     const outgoingEnabledInput = statusPanel.querySelector("[data-tj-helper-outgoing-enabled]");
     const outgoingLanguageSelect = statusPanel.querySelector("[data-tj-helper-outgoing-language]");
     const customOutgoingLanguageInput = statusPanel.querySelector("[data-tj-helper-custom-outgoing-language]");
+    const messageTimestampsInput = statusPanel.querySelector("[data-tj-helper-message-timestamps-enabled]");
     const statsElement = statusPanel.querySelector("[data-tj-helper-stats]");
     const statusElement = statusPanel.querySelector("[data-tj-helper-status]");
 
@@ -1034,6 +1179,7 @@
     customLanguageInput.value = targetLanguage;
     outgoingEnabledInput.checked = getOutgoingTranslationEnabled();
     customOutgoingLanguageInput.value = outgoingTargetLanguage;
+    messageTimestampsInput.checked = getMessageTimestampsEnabled();
     statsElement.textContent = `${state.hooked ? "hooked" : "not hooked"} | sockets ${state.sockets}, messages ${state.chatsSeen}, translations ${state.translationsShown}`;
     statusElement.textContent = state.lastStatus;
 
@@ -1055,6 +1201,7 @@
 
     installKeyboardShortcuts();
     installToolbarButton();
+    installMessageTimestamps();
     installTranslationBridge();
     injectWebSocketHook();
     setStatus("loaded");

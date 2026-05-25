@@ -13,6 +13,7 @@ const sections = [
   ["Settings", "settings.js"],
   ["Toolbar", "toolbar.js"],
   ["Message timestamps", "timestamps.js"],
+  ["Session tracker", "session-tracker.js"],
   ["Settings panel", "panel.js"],
   ["Startup", "main.js"],
 ];

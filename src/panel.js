@@ -53,6 +53,10 @@
             <input data-tj-helper-message-timestamps-enabled type="checkbox" style="margin:0;" />
             Show timestamps
           </label>
+          <label style="display:flex;align-items:center;gap:6px;margin-top:6px;color:#BFE7F1;">
+            <input data-tj-helper-session-summary-enabled type="checkbox" style="margin:0;" />
+            Session summary on leave
+          </label>
         </div>
         <div style="border-top:1px solid rgba(191,231,241,.22);padding-top:8px;">
           <div style="margin-bottom:6px;color:#E9F7FA;font-weight:700;">Status</div>
@@ -68,6 +72,7 @@
       const outgoingLanguageSelect = statusPanel.querySelector("[data-tj-helper-outgoing-language]");
       const customOutgoingLanguageInput = statusPanel.querySelector("[data-tj-helper-custom-outgoing-language]");
       const messageTimestampsInput = statusPanel.querySelector("[data-tj-helper-message-timestamps-enabled]");
+      const sessionSummaryInput = statusPanel.querySelector("[data-tj-helper-session-summary-enabled]");
 
       for (const [value, label] of LANGUAGE_OPTIONS) {
         const option = document.createElement("option");
@@ -109,6 +114,10 @@
       messageTimestampsInput.addEventListener("change", () => {
         setMessageTimestampsEnabled(messageTimestampsInput.checked);
       });
+
+      sessionSummaryInput.addEventListener("change", () => {
+        setSessionSummaryEnabled(sessionSummaryInput.checked);
+      });
     }
 
     const targetLanguage = getTargetLanguage();
@@ -119,6 +128,7 @@
     const outgoingLanguageSelect = statusPanel.querySelector("[data-tj-helper-outgoing-language]");
     const customOutgoingLanguageInput = statusPanel.querySelector("[data-tj-helper-custom-outgoing-language]");
     const messageTimestampsInput = statusPanel.querySelector("[data-tj-helper-message-timestamps-enabled]");
+    const sessionSummaryInput = statusPanel.querySelector("[data-tj-helper-session-summary-enabled]");
     const statsElement = statusPanel.querySelector("[data-tj-helper-stats]");
     const statusElement = statusPanel.querySelector("[data-tj-helper-status]");
 
@@ -134,6 +144,7 @@
     outgoingEnabledInput.checked = getOutgoingTranslationEnabled();
     customOutgoingLanguageInput.value = outgoingTargetLanguage;
     messageTimestampsInput.checked = getMessageTimestampsEnabled();
+    sessionSummaryInput.checked = getSessionSummaryEnabled();
     statsElement.textContent = `${state.hooked ? "hooked" : "not hooked"} | sockets ${state.sockets}, messages ${state.chatsSeen}, translations ${state.translationsShown}`;
     statusElement.textContent = state.lastStatus;
 

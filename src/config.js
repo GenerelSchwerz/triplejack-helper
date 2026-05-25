@@ -4,6 +4,7 @@
   const OUTGOING_LANGUAGE_STORAGE_KEY = "triplejack-helper-outgoing-language";
   const OUTGOING_ENABLED_STORAGE_KEY = "triplejack-helper-outgoing-enabled";
   const MESSAGE_TIMESTAMPS_STORAGE_KEY = "triplejack-helper-message-timestamps-enabled";
+  const SESSION_SUMMARY_STORAGE_KEY = "triplejack-helper-session-summary-enabled";
   const PANEL_TOGGLE_KEY = "L";
   const LANGUAGE_PROMPT_KEY = "Y";
   const LANGUAGE_OPTIONS = [
@@ -36,5 +37,6 @@
     panelVisible: false,
   };
   let statusPanel;
+  let sessionSummaryPanel;
   let timestampObserver;
   let timestampRenderQueued = false;

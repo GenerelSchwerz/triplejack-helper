@@ -14,6 +14,10 @@
     return localStorage.getItem(MESSAGE_TIMESTAMPS_STORAGE_KEY) === "1";
   }
 
+  function getSessionSummaryEnabled() {
+    return localStorage.getItem(SESSION_SUMMARY_STORAGE_KEY) !== "0";
+  }
+
   function setTargetLanguage(language) {
     const normalizedLanguage = normalizeLanguageCode(language);
     if (!/^[a-z]{2,3}(-[a-z0-9]{2,8})?$/i.test(normalizedLanguage)) {
@@ -48,6 +52,12 @@
     localStorage.setItem(MESSAGE_TIMESTAMPS_STORAGE_KEY, enabled ? "1" : "0");
     setStatus(`message timestamps ${enabled ? "enabled" : "disabled"}`);
     renderMessageTimestamps();
+    renderStatusPanel();
+  }
+
+  function setSessionSummaryEnabled(enabled) {
+    localStorage.setItem(SESSION_SUMMARY_STORAGE_KEY, enabled ? "1" : "0");
+    setStatus(`session summary ${enabled ? "enabled" : "disabled"}`);
     renderStatusPanel();
   }
 

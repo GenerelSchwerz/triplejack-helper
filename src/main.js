@@ -9,6 +9,7 @@
     installKeyboardShortcuts();
     installToolbarButton();
     installMessageTimestamps();
+    installSessionTracker();
     installTranslationBridge();
     injectWebSocketHook();
     setStatus("loaded");

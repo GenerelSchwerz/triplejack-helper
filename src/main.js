@@ -7,6 +7,7 @@
     GM_registerMenuCommand("Set Triplejack target language", promptForTargetLanguage);
 
     installKeyboardShortcuts();
+    installOutsideClickDismissal();
     installToolbarButton();
     installMessageTimestamps();
     installSessionTracker();

@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Triplejack Helper
 // @namespace    https://triplejack.com/
-// @version      0.5.1
+// @version      0.5.2
 // @description  Translates Triplejack public chat and direct messages using Google Translate requests.
 // @author       Rocco A.
 // @license      MIT
@@ -64,6 +64,7 @@
   };
   let statusPanel;
   let sessionSummaryPanel;
+  let outsideClickDismissalInstalled = false;
   let timestampObserver;
   let timestampRenderQueued = false;
 
@@ -926,6 +927,33 @@
     });
   }
 
+  function installOutsideClickDismissal() {
+    if (outsideClickDismissalInstalled) {
+      return;
+    }
+
+    outsideClickDismissalInstalled = true;
+    document.addEventListener("click", (event) => {
+      const target = event.target;
+
+      if (sessionSummaryPanel && !sessionSummaryPanel.contains(target)) {
+        sessionSummaryPanel.remove();
+        sessionSummaryPanel = null;
+      }
+
+      if (!state.panelVisible || !statusPanel || statusPanel.contains(target)) {
+        return;
+      }
+
+      if (target?.closest?.("[data-tj-helper-toolbar-button]")) {
+        return;
+      }
+
+      state.panelVisible = false;
+      renderStatusPanel();
+    });
+  }
+
   // Toolbar
   function installToolbarButton() {
     const observer = new MutationObserver(() => {
@@ -1237,6 +1265,21 @@
       return;
     }
 
+    if (command === "last_chip_stack") {
+      updateSessionStack(toNumberOrNull(detail.data.slice("last_chip_stack:".length)));
+      return;
+    }
+
+    if (detail.data.includes("/bet:")) {
+      updateSessionFromBet(detail.data);
+      return;
+    }
+
+    if (command === "win") {
+      updateSessionFromWin(detail.data);
+      return;
+    }
+
     if (command === "h") {
       updateSessionFromHand(detail.data);
       return;
@@ -1345,13 +1388,49 @@
     }
   }
 
-  function updateSessionStack(stack) {
+  function updateSessionFromBet(data) {
+    const betPayload = getCompoundSubframe(data, "bet");
+    if (!betPayload) {
+      return;
+    }
+
+    const fields = splitProtocolFields(betPayload);
+    const stackRows = getProtocolTupleRows(fields[14] || "");
+    for (const rowText of stackRows) {
+      const fields = splitProtocolFields(stripOuterBraces(rowText));
+      if (fields[0] !== sessionTracker.selfPlayerId) {
+        continue;
+      }
+
+      updateSessionStack(toNumberOrNull(fields[1]), toNumberOrNull(fields[2]));
+      return;
+    }
+  }
+
+  function updateSessionFromWin(data) {
+    const fields = splitProtocolFields(stripOuterBraces(data.slice("win:".length)));
+    const winBlocks = getProtocolTupleRows(fields[0] || "");
+    const firstWinBlock = splitProtocolFields(stripOuterBraces(winBlocks[0] || ""));
+    const playerRows = getProtocolTupleRows(firstWinBlock[5] || "");
+
+    for (const rowText of playerRows) {
+      const fields = splitProtocolFields(stripOuterBraces(rowText));
+      if (fields[0] !== sessionTracker.selfPlayerId) {
+        continue;
+      }
+
+      updateSessionStack(toNumberOrNull(fields[4]));
+      return;
+    }
+  }
+
+  function updateSessionStack(stack, committedAmount = null) {
     if (stack === null) {
       return;
     }
 
-    if (sessionTracker.startStack === null && stack > 0) {
-      sessionTracker.startStack = stack;
+    if ((sessionTracker.startStack === null || sessionTracker.startStack <= 0) && stack > 0) {
+      sessionTracker.startStack = stack + Math.max(committedAmount || 0, 0);
     }
 
     sessionTracker.endStack = stack;
@@ -1489,7 +1568,7 @@
   }
 
   function isLobbyReturnPacket(command) {
-    return ["init_lobby", "lbrowse", "addgames", "gamesdone"].includes(command);
+    return command === "gamesdone";
   }
 
   function getSessionPacketCommand(data) {
@@ -1779,6 +1858,7 @@
     GM_registerMenuCommand("Set Triplejack target language", promptForTargetLanguage);
 
     installKeyboardShortcuts();
+    installOutsideClickDismissal();
     installToolbarButton();
     installMessageTimestamps();
     installSessionTracker();

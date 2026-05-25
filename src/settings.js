@@ -108,3 +108,30 @@
       }
     });
   }
+
+  function installOutsideClickDismissal() {
+    if (outsideClickDismissalInstalled) {
+      return;
+    }
+
+    outsideClickDismissalInstalled = true;
+    document.addEventListener("click", (event) => {
+      const target = event.target;
+
+      if (sessionSummaryPanel && !sessionSummaryPanel.contains(target)) {
+        sessionSummaryPanel.remove();
+        sessionSummaryPanel = null;
+      }
+
+      if (!state.panelVisible || !statusPanel || statusPanel.contains(target)) {
+        return;
+      }
+
+      if (target?.closest?.("[data-tj-helper-toolbar-button]")) {
+        return;
+      }
+
+      state.panelVisible = false;
+      renderStatusPanel();
+    });
+  }

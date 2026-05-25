@@ -286,15 +286,23 @@
     resizeHandle.setAttribute("aria-orientation", "vertical");
     resizeHandle.style.cssText = [
       "position:absolute",
-      "left:-4px",
+      "left:-14px",
       "top:0",
       "bottom:0",
-      "width:8px",
-      "z-index:5",
+      "width:24px",
+      "z-index:20",
       "cursor:col-resize",
       "touch-action:none",
       "background:transparent",
+      "display:flex",
+      "align-items:center",
+      "justify-content:center",
     ].join(";");
+    resizeHandle.innerHTML = `
+      <div aria-hidden="true" style="width:14px;height:62px;border:1px solid rgba(137,198,215,.72);border-right-color:rgba(137,198,215,.42);border-radius:7px 0 0 7px;background:rgba(18,31,39,.98);box-shadow:0 0 0 1px rgba(3,10,14,.65),0 4px 14px rgba(0,0,0,.36);display:flex;align-items:center;justify-content:center;">
+        <div style="width:5px;height:34px;border-left:1px solid rgba(191,231,241,.62);border-right:1px solid rgba(191,231,241,.34);"></div>
+      </div>
+    `;
     resizeHandle.addEventListener("pointerdown", handleHelperPanelResizePointerDown);
     return resizeHandle;
   }
@@ -314,16 +322,19 @@
         return;
       }
 
-      setHelperPanelWidth(viewportWidth - moveEvent.clientX);
+      setHelperPanelWidth(viewportWidth - moveEvent.clientX, { silent: true });
     };
 
     const stop = () => {
+      const panelWidth = getHelperPanelWidth();
       target.releasePointerCapture?.(pointerId);
       document.body.style.cursor = "";
       document.body.style.userSelect = "";
       window.removeEventListener("pointermove", move, true);
       window.removeEventListener("pointerup", stop, true);
       window.removeEventListener("pointercancel", stop, true);
+      setStatus(`panel width set to ${panelWidth}px`);
+      renderStatusPanel();
     };
 
     window.addEventListener("pointermove", move, true);

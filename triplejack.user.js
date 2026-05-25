@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Triplejack Helper
 // @namespace    https://triplejack.com/
-// @version      0.6.23
+// @version      0.6.24
 // @description  Adds Triplejack chat translation, message tools, and session tracking helpers.
 // @author       Rocco A.
 // @license      MIT
@@ -1219,15 +1219,23 @@
     resizeHandle.setAttribute("aria-orientation", "vertical");
     resizeHandle.style.cssText = [
       "position:absolute",
-      "left:-4px",
+      "left:-14px",
       "top:0",
       "bottom:0",
-      "width:8px",
-      "z-index:5",
+      "width:24px",
+      "z-index:20",
       "cursor:col-resize",
       "touch-action:none",
       "background:transparent",
+      "display:flex",
+      "align-items:center",
+      "justify-content:center",
     ].join(";");
+    resizeHandle.innerHTML = `
+      <div aria-hidden="true" style="width:14px;height:62px;border:1px solid rgba(137,198,215,.72);border-right-color:rgba(137,198,215,.42);border-radius:7px 0 0 7px;background:rgba(18,31,39,.98);box-shadow:0 0 0 1px rgba(3,10,14,.65),0 4px 14px rgba(0,0,0,.36);display:flex;align-items:center;justify-content:center;">
+        <div style="width:5px;height:34px;border-left:1px solid rgba(191,231,241,.62);border-right:1px solid rgba(191,231,241,.34);"></div>
+      </div>
+    `;
     resizeHandle.addEventListener("pointerdown", handleHelperPanelResizePointerDown);
     return resizeHandle;
   }
@@ -1247,16 +1255,19 @@
         return;
       }
 
-      setHelperPanelWidth(viewportWidth - moveEvent.clientX);
+      setHelperPanelWidth(viewportWidth - moveEvent.clientX, { silent: true });
     };
 
     const stop = () => {
+      const panelWidth = getHelperPanelWidth();
       target.releasePointerCapture?.(pointerId);
       document.body.style.cursor = "";
       document.body.style.userSelect = "";
       window.removeEventListener("pointermove", move, true);
       window.removeEventListener("pointerup", stop, true);
       window.removeEventListener("pointercancel", stop, true);
+      setStatus(`panel width set to ${panelWidth}px`);
+      renderStatusPanel();
     };
 
     window.addEventListener("pointermove", move, true);
@@ -1493,10 +1504,14 @@
     renderStatusPanel();
   }
 
-  function setHelperPanelWidth(width) {
+  function setHelperPanelWidth(width, options = {}) {
     const panelWidth = clampHelperPanelWidth(width);
     localStorage.setItem(HELPER_PANEL_WIDTH_STORAGE_KEY, String(panelWidth));
     applyHelperPanelWidth();
+    if (options.silent) {
+      return;
+    }
+
     setStatus(`panel width set to ${panelWidth}px`);
     renderStatusPanel();
   }
@@ -3464,13 +3479,6 @@
               <input data-tj-helper-session-summary-enabled type="checkbox" style="margin:0;" />
             </label>
           </section>
-          <section style="border:1px solid rgba(191,231,241,.2);border-radius:6px;padding:10px;background:rgba(255,255,255,.025);">
-            <div style="margin-bottom:8px;color:#E9F7FA;font-weight:700;">Panel</div>
-            <label style="display:grid;grid-template-columns:minmax(0,1fr) 64px;gap:8px;align-items:center;color:#BFE7F1;">
-              <input data-tj-helper-panel-width type="range" min="${HELPER_PANEL_MIN_WIDTH}" max="${HELPER_PANEL_MAX_WIDTH}" step="10" style="width:100%;min-width:0;margin:0;" />
-              <input data-tj-helper-panel-width-value type="number" min="${HELPER_PANEL_MIN_WIDTH}" max="${HELPER_PANEL_MAX_WIDTH}" step="10" style="width:100%;min-width:0;background:#DDEAF2;color:#111;border:1px solid #74A7B9;border-radius:4px;padding:4px;box-sizing:border-box;" />
-            </label>
-          </section>
           <div style="border-top:1px solid rgba(191,231,241,.22);padding-top:8px;">
             <div style="margin-bottom:6px;color:#E9F7FA;font-weight:700;">Status</div>
             <div data-tj-helper-stats style="color:#D6EEF5;"></div>
@@ -3486,8 +3494,6 @@
       const customOutgoingLanguageInput = statusPanel.querySelector("[data-tj-helper-custom-outgoing-language]");
       const messageTimestampsInput = statusPanel.querySelector("[data-tj-helper-message-timestamps-enabled]");
       const sessionSummaryInput = statusPanel.querySelector("[data-tj-helper-session-summary-enabled]");
-      const panelWidthInput = statusPanel.querySelector("[data-tj-helper-panel-width]");
-      const panelWidthValueInput = statusPanel.querySelector("[data-tj-helper-panel-width-value]");
 
       for (const [value, label] of LANGUAGE_OPTIONS) {
         const option = document.createElement("option");
@@ -3528,14 +3534,6 @@
       sessionSummaryInput.addEventListener("change", () => {
         setSessionSummaryEnabled(sessionSummaryInput.checked);
       });
-
-      panelWidthInput.addEventListener("input", () => {
-        setHelperPanelWidth(panelWidthInput.value);
-      });
-
-      panelWidthValueInput.addEventListener("change", () => {
-        setHelperPanelWidth(panelWidthValueInput.value);
-      });
     }
 
     const targetLanguage = getTargetLanguage();
@@ -3547,8 +3545,6 @@
     const customOutgoingLanguageInput = statusPanel.querySelector("[data-tj-helper-custom-outgoing-language]");
     const messageTimestampsInput = statusPanel.querySelector("[data-tj-helper-message-timestamps-enabled]");
     const sessionSummaryInput = statusPanel.querySelector("[data-tj-helper-session-summary-enabled]");
-    const panelWidthInput = statusPanel.querySelector("[data-tj-helper-panel-width]");
-    const panelWidthValueInput = statusPanel.querySelector("[data-tj-helper-panel-width-value]");
     const statsElement = statusPanel.querySelector("[data-tj-helper-stats]");
     const statusElement = statusPanel.querySelector("[data-tj-helper-status]");
 
@@ -3565,8 +3561,6 @@
     customOutgoingLanguageInput.value = outgoingTargetLanguage;
     messageTimestampsInput.checked = getMessageTimestampsEnabled();
     sessionSummaryInput.checked = getSessionSummaryEnabled();
-    panelWidthInput.value = getHelperPanelWidth();
-    panelWidthValueInput.value = getHelperPanelWidth();
     statsElement.textContent = `${state.hooked ? "hooked" : "not hooked"} | sockets ${state.sockets}, messages ${state.chatsSeen}, translations ${state.translationsShown}`;
     statusElement.textContent = state.lastStatus;
 

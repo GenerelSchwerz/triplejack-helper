@@ -65,10 +65,14 @@
     renderStatusPanel();
   }
 
-  function setHelperPanelWidth(width) {
+  function setHelperPanelWidth(width, options = {}) {
     const panelWidth = clampHelperPanelWidth(width);
     localStorage.setItem(HELPER_PANEL_WIDTH_STORAGE_KEY, String(panelWidth));
     applyHelperPanelWidth();
+    if (options.silent) {
+      return;
+    }
+
     setStatus(`panel width set to ${panelWidth}px`);
     renderStatusPanel();
   }

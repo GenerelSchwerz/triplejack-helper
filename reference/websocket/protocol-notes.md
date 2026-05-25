@@ -504,7 +504,7 @@ Feature use:
 ### `newbomb`
 
 ```text
-newbomb:<itemKey>,<unknown>,<targetOrSeat>,<x1>,<y1>,<x2>,<y2>,<physics...>,<flags...>,<effectId>
+newbomb:<itemKey>,<targetSeat>,<unknown>,<x1>,<y1>,<x2>,<y2>,<physics...>,<flags...>,<effectId>
 ```
 
 Animation/effect payload for a thrown item. Observed fields include decimal coordinates and physics-like values:
@@ -515,6 +515,8 @@ newbomb:pie,1,-1,225.0,220.0,300.0,110.0,<angleOrVelocity>,<scaleOrVelocity>,<ro
 ```
 
 Because the payload starts with an item key, this appears to be the generic thrown-item animation frame even when the command name says `newbomb`.
+
+Correction from targeted replay testing: the first numeric field after item key appears to be the target seat. Earlier notes treated the following `-1` field as the likely target, but changing that field did not change the target. Rewriting the first numeric field does.
 
 Feature use:
 
@@ -1110,7 +1112,7 @@ Inferred fields:
 Feature use:
 
 - Add or move a player id in live target rosters.
-- Preserve the player name from `init_game_data` when known; `sit` itself has not been observed carrying the display name.
+- Preserve the player name from `init_game_data`, `pc`, `side_bet_added`, or other player-reference frames when known; `sit` itself has not been observed carrying the display name.
 - Pair with `su` and lobby-return frames (`lounge:0`, `init_lobby`, `gamesdone`) to keep room-only tools disabled outside rooms.
 
 ### `h`

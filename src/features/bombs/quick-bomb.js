@@ -5,6 +5,7 @@
       nativeSend: null,
       socketId: "",
       ammoCostByItemKey: new Map(),
+      playerNameById: new Map(),
       inRoom: false,
       selfPlayerId: "",
       players: [],
@@ -208,15 +209,16 @@
       }
 
       const fields = splitProtocolFields(state.lastPacket.slice("newbomb:".length));
-      if (fields.length < 3) {
+      if (fields.length < 2) {
         return state.lastPacket;
       }
 
-      fields[2] = String(state.selectedTarget.seat);
+      fields[1] = String(state.selectedTarget.seat);
       return `newbomb:${fields.join(",")}`;
     }
 
     function updateAmmoCosts(data) {
+      updateKnownPlayerNames(data);
       updateRoomState(data);
 
       if (data.startsWith("inventory_defs:")) {
@@ -278,7 +280,7 @@
       const fields = splitProtocolFields(stripOuterBraces(rowText));
       return {
         playerId: fields[2] || "",
-        playerName: decodeProtocolText(fields[3] || ""),
+        playerName: rememberPlayerName(fields[2], fields[3]),
         seat: fields[8] || "",
       };
     }
@@ -294,7 +296,7 @@
       state.inRoom = true;
       upsertRoomPlayer({
         playerId,
-        playerName: getKnownPlayerName(playerId) || `Player ${playerId}`,
+        playerName: getKnownPlayerName(playerId),
         seat,
       });
       setStatus(`quick bomb target joined seat ${seat}`);
@@ -334,7 +336,50 @@
     }
 
     function getKnownPlayerName(playerId) {
-      return state.players.find((player) => player.playerId === playerId)?.playerName || "";
+      return state.playerNameById.get(String(playerId || "")) || "";
+    }
+
+    function updateKnownPlayerNames(data) {
+      if (data.startsWith("pc:")) {
+        const fields = splitProtocolFields(data.slice("pc:".length));
+        rememberPlayerName(fields[0], fields[1]);
+        refreshRoomPlayerNames();
+        return;
+      }
+
+      if (data.startsWith("side_bet_added:")) {
+        const fields = splitProtocolFields(data.slice("side_bet_added:".length));
+        rememberPlayerReference(fields[3]);
+        rememberPlayerReference(fields[4]);
+        refreshRoomPlayerNames();
+      }
+    }
+
+    function rememberPlayerReference(reference) {
+      const [playerName = "", playerId = ""] = String(reference || "").split(":");
+      rememberPlayerName(playerId, playerName);
+    }
+
+    function rememberPlayerName(playerId, playerName) {
+      const normalizedPlayerId = String(playerId || "");
+      const normalizedPlayerName = decodeProtocolText(playerName || "").trim();
+      if (normalizedPlayerId && normalizedPlayerName) {
+        state.playerNameById.set(normalizedPlayerId, normalizedPlayerName);
+      }
+
+      return normalizedPlayerName || getKnownPlayerName(normalizedPlayerId);
+    }
+
+    function refreshRoomPlayerNames() {
+      state.players = state.players.map((player) => {
+        return {
+          ...player,
+          playerName: player.playerName || getKnownPlayerName(player.playerId),
+        };
+      });
+      if (state.selectedTarget) {
+        state.selectedTarget = state.players.find((player) => player.playerId === state.selectedTarget?.playerId) || null;
+      }
     }
 
     function leaveRoom() {

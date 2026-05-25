@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Triplejack Helper
 // @namespace    https://triplejack.com/
-// @version      0.8.6
+// @version      0.8.7
 // @description  Adds Triplejack chat translation, message tools, and session tracking helpers.
 // @author       Rocco A.
 // @license      MIT
@@ -1002,6 +1002,9 @@
     collapsePanelShellImmediately();
     if (shellButton?.isConnected) {
       dispatchNativePanelPointerDown(shellButton);
+      collapsePanelShellImmediately();
+      window.requestAnimationFrame(collapsePanelShellImmediately);
+      window.setTimeout(collapsePanelShellImmediately, 0);
     }
     helperShellNativeButton = null;
     scheduleHelperPanelCloseCleanup();

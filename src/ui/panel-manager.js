@@ -68,6 +68,9 @@
     collapsePanelShellImmediately();
     if (shellButton?.isConnected) {
       dispatchNativePanelPointerDown(shellButton);
+      collapsePanelShellImmediately();
+      window.requestAnimationFrame(collapsePanelShellImmediately);
+      window.setTimeout(collapsePanelShellImmediately, 0);
     }
     helperShellNativeButton = null;
     scheduleHelperPanelCloseCleanup();

@@ -141,7 +141,10 @@
       "display:flex",
       "align-items:stretch",
       "flex:1 1 auto",
+      "position:relative",
     ].join(";");
+
+    const resizeHandle = createHelperPanelResizeHandle();
 
     const aside = document.createElement("aside");
     aside.className = nativeAside?.className || nativePanelAsideClassName || "scaling-panel-container";
@@ -161,9 +164,11 @@
       "border-left:1px solid rgba(137,198,215,.55)",
     ].join(";");
 
+    wrapper.appendChild(resizeHandle);
     wrapper.appendChild(aside);
     panelContainer.appendChild(wrapper);
     helperPanelHost = aside;
+    applyHelperPanelWidth(panelContainer);
     logPanelDebug("helper-panel-mount-created", {
       activePanelId: state.activePanelId,
       usedNativeWrapperClass: Boolean(nativeWrapper?.className || nativePanelWrapperClassName),
@@ -268,8 +273,77 @@
 
     panelRegion.appendChild(panelContainer);
     sceneRow.appendChild(panelRegion);
+    applyHelperPanelWidth(panelContainer);
     scheduleLayoutRefresh();
     return panelContainer;
+  }
+
+  function createHelperPanelResizeHandle() {
+    const resizeHandle = document.createElement("div");
+    resizeHandle.dataset.tjHelperPanelResizeHandle = "1";
+    resizeHandle.title = "Resize panel";
+    resizeHandle.setAttribute("role", "separator");
+    resizeHandle.setAttribute("aria-orientation", "vertical");
+    resizeHandle.style.cssText = [
+      "position:absolute",
+      "left:-4px",
+      "top:0",
+      "bottom:0",
+      "width:8px",
+      "z-index:5",
+      "cursor:col-resize",
+      "touch-action:none",
+      "background:transparent",
+    ].join(";");
+    resizeHandle.addEventListener("pointerdown", handleHelperPanelResizePointerDown);
+    return resizeHandle;
+  }
+
+  function handleHelperPanelResizePointerDown(event) {
+    event.preventDefault();
+    event.stopPropagation();
+    const pointerId = event.pointerId;
+    const target = event.currentTarget;
+    target.setPointerCapture?.(pointerId);
+    document.body.style.cursor = "col-resize";
+    document.body.style.userSelect = "none";
+
+    const move = (moveEvent) => {
+      const viewportWidth = window.innerWidth || document.documentElement.clientWidth || 0;
+      if (!viewportWidth) {
+        return;
+      }
+
+      setHelperPanelWidth(viewportWidth - moveEvent.clientX);
+    };
+
+    const stop = () => {
+      target.releasePointerCapture?.(pointerId);
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
+      window.removeEventListener("pointermove", move, true);
+      window.removeEventListener("pointerup", stop, true);
+      window.removeEventListener("pointercancel", stop, true);
+    };
+
+    window.addEventListener("pointermove", move, true);
+    window.addEventListener("pointerup", stop, true);
+    window.addEventListener("pointercancel", stop, true);
+  }
+
+  function applyHelperPanelWidth(panelContainer = document.querySelector('[data-testid="panel-container"]')) {
+    const panelRegion = panelContainer?.parentElement;
+    if (!panelRegion) {
+      scheduleLayoutRefresh();
+      return;
+    }
+
+    const panelWidth = getHelperPanelWidth();
+    panelRegion.style.flex = `0 0 ${panelWidth}px`;
+    panelRegion.style.width = `${panelWidth}px`;
+    panelRegion.style.maxWidth = `min(${panelWidth}px,calc(100vw - 64px))`;
+    panelContainer.style.width = "100%";
+    scheduleLayoutRefresh();
   }
 
   function captureNativePanelClasses(panelContainer) {
@@ -402,6 +476,7 @@
     window.dispatchEvent(new Event("resize"));
     window.requestAnimationFrame(() => {
       window.dispatchEvent(new Event("resize"));
+      sessionHistoryChart?.resize?.();
     });
   }
 

@@ -18,6 +18,10 @@
     return localStorage.getItem(SESSION_SUMMARY_STORAGE_KEY) !== "0";
   }
 
+  function getHelperPanelWidth() {
+    return clampHelperPanelWidth(localStorage.getItem(HELPER_PANEL_WIDTH_STORAGE_KEY) || HELPER_PANEL_WIDTH);
+  }
+
   function setTargetLanguage(language) {
     const normalizedLanguage = normalizeLanguageCode(language);
     if (!/^[a-z]{2,3}(-[a-z0-9]{2,8})?$/i.test(normalizedLanguage)) {
@@ -59,6 +63,23 @@
     localStorage.setItem(SESSION_SUMMARY_STORAGE_KEY, enabled ? "1" : "0");
     setStatus(`session summary ${enabled ? "enabled" : "disabled"}`);
     renderStatusPanel();
+  }
+
+  function setHelperPanelWidth(width) {
+    const panelWidth = clampHelperPanelWidth(width);
+    localStorage.setItem(HELPER_PANEL_WIDTH_STORAGE_KEY, String(panelWidth));
+    applyHelperPanelWidth();
+    setStatus(`panel width set to ${panelWidth}px`);
+    renderStatusPanel();
+  }
+
+  function clampHelperPanelWidth(width) {
+    const numericWidth = Number(width);
+    if (!Number.isFinite(numericWidth)) {
+      return HELPER_PANEL_WIDTH;
+    }
+
+    return Math.min(HELPER_PANEL_MAX_WIDTH, Math.max(HELPER_PANEL_MIN_WIDTH, Math.round(numericWidth)));
   }
 
   function normalizeLanguageCode(language) {

@@ -6,6 +6,7 @@
   const MESSAGE_TIMESTAMPS_STORAGE_KEY = "triplejack-helper-message-timestamps-enabled";
   const SESSION_SUMMARY_STORAGE_KEY = "triplejack-helper-session-summary-enabled";
   const SESSION_HISTORY_STORAGE_KEY = "triplejack-helper-session-history";
+  const HELPER_PANEL_WIDTH_STORAGE_KEY = "triplejack-helper-panel-width";
   const PANEL_TOGGLE_KEY = "L";
   const LANGUAGE_PROMPT_KEY = "Y";
   const LANGUAGE_OPTIONS = [
@@ -29,6 +30,8 @@
   const SOCKET_MESSAGE_EVENT = "tj-helper-websocket-message";
   const STATUS_EVENT = "tj-helper-status";
   const HELPER_PANEL_WIDTH = 390;
+  const HELPER_PANEL_MIN_WIDTH = 300;
+  const HELPER_PANEL_MAX_WIDTH = 720;
   const PANEL_DEBUG_LOG_PREFIX = "[Triplejack Helper panels]";
   const pageWindow = typeof unsafeWindow === "undefined" ? window : unsafeWindow;
   const translationCache = new Map();

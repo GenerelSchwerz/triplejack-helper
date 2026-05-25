@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Triplejack Helper
 // @namespace    https://triplejack.com/
-// @version      0.3.3
+// @version      0.3.4
 // @description  Translates Triplejack public chat and direct messages using Google Translate requests.
 // @author       Rocco A.
 // @license      MIT
@@ -885,8 +885,8 @@
     helperButton.type = "button";
     helperButton.title = "Translate Settings";
     helperButton.className = referenceButton.className;
-    helperButton.style.paddingLeft = "3px";
-    helperButton.style.paddingRight = "3px";
+    helperButton.style.paddingLeft = "5px";
+    helperButton.style.paddingRight = "5px";
     helperButton.dataset.tjHelperInactiveClass = referenceButton.className;
     helperButton.dataset.tjHelperActiveClass =
       activeButton?.className || insertTarget.className || referenceButton.className;
@@ -896,7 +896,7 @@
     helperButton.innerHTML = `
       <div class="${escapeAttribute(outerClassName)}">
         <div data-testid="icon-scale-wrapper" class="${escapeAttribute(iconWrapperClassName)}">
-          <span style="font:700 21px/1 Arial,sans-serif;color:currentColor;">T</span>
+          <span style="font:700 23px/1 Arial,sans-serif;color:currentColor;">T</span>
         </div>
       </div>
     `;

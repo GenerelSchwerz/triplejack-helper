@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Triplejack Helper
 // @namespace    https://triplejack.com/
-// @version      0.6.15
+// @version      0.6.16
 // @description  Translates Triplejack public chat and direct messages using Google Translate requests.
 // @author       Rocco A.
 // @license      MIT
@@ -931,6 +931,7 @@
   const SESSION_HISTORY_PANEL_ID = "session-history";
   let nativePanelWrapperClassName = "";
   let nativePanelAsideClassName = "";
+  let pendingHelperPanelOpenId = 0;
 
   function isHelperPanelActive(panelId) {
     return state.activePanelId === panelId;
@@ -957,18 +958,21 @@
       return;
     }
 
+    const panelContainer = document.querySelector('[data-testid="panel-container"]');
+    captureNativePanelClasses(panelContainer);
     logPanelDebug("helper-panel-closing-native-before-open", {
       panelId,
       nativeTitle: activeNativePanelButton.title || "",
       nativeAriaLabel: activeNativePanelButton.getAttribute("aria-label") || "",
     });
     dispatchNativePanelPointerDown(activeNativePanelButton);
-    window.requestAnimationFrame(() => {
+    waitForNativePanelClose(() => {
       setActiveHelperPanel(panelId);
     });
   }
 
   function closeHelperPanels() {
+    pendingHelperPanelOpenId += 1;
     setActiveHelperPanel("");
   }
 
@@ -1007,6 +1011,15 @@
       return null;
     }
 
+    if (helperPanelHost?.isConnected) {
+      logPanelDebug("helper-panel-mount-reusing-host", {
+        activePanelId: state.activePanelId,
+      });
+      return helperPanelHost;
+    }
+
+    removeHelperPanelHost({ preservePanelShell: true });
+
     const panelContainer = getNativePanelContainer();
     if (!panelContainer) {
       logPanelDebug("helper-panel-mount-missing-container", {
@@ -1015,17 +1028,9 @@
       return null;
     }
 
-    if (helperPanelHost && panelContainer.contains(helperPanelHost)) {
-      logPanelDebug("helper-panel-mount-reusing-host", {
-        activePanelId: state.activePanelId,
-      });
-      return helperPanelHost;
-    }
-
-    removeHelperPanelHost();
-
     const nativeWrapper = panelContainer.querySelector(":scope > div:not([data-tj-helper-panel-wrapper])");
     const nativeAside = panelContainer.querySelector("aside.scaling-panel-container");
+    captureNativePanelClasses(panelContainer);
     const wrapper = document.createElement("div");
     wrapper.dataset.tjHelperPanelWrapper = "1";
     if (nativeWrapper?.className || nativePanelWrapperClassName) {
@@ -1169,6 +1174,18 @@
     return panelContainer;
   }
 
+  function captureNativePanelClasses(panelContainer) {
+    const nativeWrapper = panelContainer?.querySelector?.(":scope > div:not([data-tj-helper-panel-wrapper])");
+    const nativeAside = panelContainer?.querySelector?.("aside.scaling-panel-container");
+
+    if (nativeWrapper?.className) {
+      nativePanelWrapperClassName = nativeWrapper.className;
+    }
+    if (nativeAside?.className) {
+      nativePanelAsideClassName = nativeAside.className;
+    }
+  }
+
   function handleNativePanelButtonPointerDown(event) {
     const nativePanelButton = event.target?.closest?.('button[data-testid="panel button"]');
     if (!nativePanelButton || nativePanelButton.dataset.tjHelperToolbarButton) {
@@ -1184,6 +1201,7 @@
       title: nativePanelButton.title || "",
       ariaLabel: nativePanelButton.getAttribute("aria-label") || "",
     });
+    pendingHelperPanelOpenId += 1;
     state.activePanelId = "";
     removeHelperPanelHost({ preservePanelShell: false });
     renderToolbarButtons();
@@ -1213,6 +1231,34 @@
         pointerType: "mouse",
       }),
     );
+  }
+
+  function waitForNativePanelClose(callback) {
+    const openId = ++pendingHelperPanelOpenId;
+    const startedAt = performance.now();
+
+    const wait = () => {
+      if (openId !== pendingHelperPanelOpenId) {
+        logPanelDebug("helper-panel-open-cancelled", { openId });
+        return;
+      }
+
+      const panelContainer = document.querySelector('[data-testid="panel-container"]');
+      const nativePanelIsGone = !panelContainer || panelContainer.dataset.tjHelperPanelContainer;
+      if (nativePanelIsGone || performance.now() - startedAt > 600) {
+        logPanelDebug("helper-panel-native-close-wait-complete", {
+          openId,
+          nativePanelIsGone,
+          elapsedMs: Math.round(performance.now() - startedAt),
+        });
+        callback();
+        return;
+      }
+
+      window.requestAnimationFrame(wait);
+    };
+
+    window.requestAnimationFrame(wait);
   }
 
   function scheduleLayoutRefresh() {

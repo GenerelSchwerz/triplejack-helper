@@ -43,6 +43,5 @@
   let sessionSummaryPanel;
   let sessionHistoryPanel;
   let helperPanelHost;
-  let outsideClickDismissalInstalled = false;
   let timestampObserver;
   let timestampRenderQueued = false;

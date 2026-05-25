@@ -1,22 +1,31 @@
   const SETTINGS_PANEL_ID = "settings";
   const SESSION_HISTORY_PANEL_ID = "session-history";
+  let isClosingNativePanelForHelper = false;
 
   function isHelperPanelActive(panelId) {
     return state.activePanelId === panelId;
   }
 
   function toggleHelperPanel(panelId) {
-    state.activePanelId = state.activePanelId === panelId ? "" : panelId;
-    renderHelperPanels();
+    const nextPanelId = state.activePanelId === panelId ? "" : panelId;
+    setActiveHelperPanel(nextPanelId);
   }
 
   function openHelperPanel(panelId) {
-    state.activePanelId = panelId;
-    renderHelperPanels();
+    setActiveHelperPanel(panelId);
   }
 
   function closeHelperPanels() {
-    state.activePanelId = "";
+    setActiveHelperPanel("");
+  }
+
+  function setActiveHelperPanel(panelId) {
+    state.activePanelId = panelId;
+    if (panelId && closeActiveNativePanel()) {
+      window.setTimeout(renderHelperPanels, 0);
+      return;
+    }
+
     renderHelperPanels();
   }
 
@@ -127,6 +136,42 @@
     panelRegion.appendChild(panelContainer);
     sceneRow.appendChild(panelRegion);
     return panelContainer;
+  }
+
+  function closeActiveNativePanel() {
+    const activeNativeButton = document.querySelector(
+      'button[data-testid="panel button"][data-is-active="true"]:not([data-tj-helper-toolbar-button])',
+    );
+    if (!activeNativeButton) {
+      return false;
+    }
+
+    isClosingNativePanelForHelper = true;
+    try {
+      activeNativeButton.click();
+    } finally {
+      isClosingNativePanelForHelper = false;
+    }
+    return true;
+  }
+
+  function handleNativePanelButtonClick(event) {
+    if (isClosingNativePanelForHelper) {
+      return;
+    }
+
+    const nativePanelButton = event.target?.closest?.('button[data-testid="panel button"]');
+    if (!nativePanelButton || nativePanelButton.dataset.tjHelperToolbarButton) {
+      return;
+    }
+
+    if (!state.activePanelId) {
+      return;
+    }
+
+    state.activePanelId = "";
+    removeHelperPanelHost();
+    renderToolbarButtons();
   }
 
   function getActiveHelperPanelElement() {

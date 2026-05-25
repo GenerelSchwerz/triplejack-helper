@@ -9,6 +9,7 @@
     });
 
     document.addEventListener("DOMContentLoaded", renderToolbarButtons, { once: true });
+    document.addEventListener("click", handleNativePanelButtonClick, true);
     window.addEventListener("load", renderToolbarButtons, { once: true });
 
     for (const delay of [0, 250, 1000, 2500]) {

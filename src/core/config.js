@@ -28,6 +28,7 @@
   const PACKET_INTERCEPT_EVENT = "tj-helper-websocket-packet";
   const SOCKET_MESSAGE_EVENT = "tj-helper-websocket-message";
   const STATUS_EVENT = "tj-helper-status";
+  const HELPER_PANEL_WIDTH = 390;
   const pageWindow = typeof unsafeWindow === "undefined" ? window : unsafeWindow;
   const translationCache = new Map();
   const state = {
@@ -41,6 +42,8 @@
   let statusPanel;
   let sessionSummaryPanel;
   let sessionHistoryPanel;
+  let helperPanelHost;
+  let helperPanelLayoutStyle;
   let outsideClickDismissalInstalled = false;
   let timestampObserver;
   let timestampRenderQueued = false;

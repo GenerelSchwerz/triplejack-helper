@@ -71,7 +71,7 @@
   function getTimestampMessageElements() {
     const messageElements = new Set();
     const selectors = [
-      '[aria-label="chat messages"] .MuiTypography-root.MuiTypography-body1',
+      '[aria-label="chat messages"] > div > .MuiTypography-root.MuiTypography-body1.scaling-panel-contents',
       'aside[aria-label="active conversation panel"] .scaling-panel-contents',
     ];
 
@@ -120,8 +120,17 @@
       return false;
     }
 
+    if (isPublicChatMessage && !isTopLevelPublicChatMessageElement(element)) {
+      return false;
+    }
+
     const messageText = getMessageElementText(element).replace(/\d{1,2}:\d{2}\s*(AM|PM)?/gi, "").trim();
     return Boolean(messageText);
+  }
+
+  function isTopLevelPublicChatMessageElement(element) {
+    const chatMessagesElement = element.closest('[aria-label="chat messages"]');
+    return Boolean(chatMessagesElement && element.parentElement?.parentElement === chatMessagesElement);
   }
 
   function getMessageTimestamp(messageElement) {

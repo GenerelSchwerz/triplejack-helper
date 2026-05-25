@@ -14,8 +14,9 @@
 
     window.addEventListener("pointerdown", handleHelperToolbarPointerProbe, true);
     window.addEventListener("mousedown", handleHelperToolbarPointerProbe, true);
-    window.addEventListener("click", handleHelperToolbarButtonClick, true);
-    window.addEventListener("click", handleNativePanelButtonClick, true);
+    window.addEventListener("pointerdown", handleHelperToolbarButtonPointerDown, true);
+    window.addEventListener("pointerdown", handleNativePanelButtonPointerDown, true);
+    window.addEventListener("click", handleHelperToolbarButtonClickFallback, true);
     document.addEventListener("DOMContentLoaded", renderToolbarButtons, { once: true });
     window.addEventListener("load", renderToolbarButtons, { once: true });
 
@@ -49,6 +50,7 @@
     }
 
     for (const helperButton of document.querySelectorAll("[data-tj-helper-toolbar-button]")) {
+      refreshHelperToolbarButtonClasses(helperButton);
       if (state.activePanelId === helperButton.dataset.tjHelperToolbarButton) {
         helperButton.className = helperButton.dataset.tjHelperActiveClass || helperButton.className;
         helperButton.dataset.isActive = "true";
@@ -65,6 +67,23 @@
         insertedCount,
         totalHelperButtons: document.querySelectorAll("[data-tj-helper-toolbar-button]").length,
       });
+    }
+  }
+
+  function refreshHelperToolbarButtonClasses(helperButton) {
+    const toolbar = helperButton.parentElement;
+    const inactiveNativeButton = toolbar?.querySelector(
+      'button[data-testid="panel button"]:not([data-is-active="true"]):not([data-tj-helper-toolbar-button])',
+    );
+    const activeNativeButton = toolbar?.querySelector(
+      'button[data-testid="panel button"][data-is-active="true"]:not([data-tj-helper-toolbar-button])',
+    );
+
+    if (inactiveNativeButton?.className) {
+      helperButton.dataset.tjHelperInactiveClass = inactiveNativeButton.className;
+    }
+    if (activeNativeButton?.className) {
+      helperButton.dataset.tjHelperActiveClass = activeNativeButton.className;
     }
   }
 
@@ -110,13 +129,13 @@
     });
   }
 
-  function handleHelperToolbarButtonClick(event) {
+  function handleHelperToolbarButtonPointerDown(event) {
     const helperButton = event.target?.closest?.("[data-tj-helper-toolbar-button]");
     if (!helperButton) {
       return;
     }
 
-    logPanelDebug("helper-toolbar-click-captured", {
+    logPanelDebug("helper-toolbar-pointerdown-captured", {
       panelId: helperButton.dataset.tjHelperToolbarButton,
       activePanelId: state.activePanelId,
       eventPhase: event.eventPhase,
@@ -127,6 +146,17 @@
     event.stopPropagation();
     event.stopImmediatePropagation?.();
     toggleHelperPanel(helperButton.dataset.tjHelperToolbarButton);
+  }
+
+  function handleHelperToolbarButtonClickFallback(event) {
+    const helperButton = event.target?.closest?.("[data-tj-helper-toolbar-button]");
+    if (!helperButton) {
+      return;
+    }
+
+    event.preventDefault();
+    event.stopPropagation();
+    event.stopImmediatePropagation?.();
   }
 
   function getHelperToolbarItems() {

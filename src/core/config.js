@@ -40,6 +40,7 @@
   };
   let statusPanel;
   let sessionSummaryPanel;
+  let sessionHistoryPanel;
   let outsideClickDismissalInstalled = false;
   let timestampObserver;
   let timestampRenderQueued = false;

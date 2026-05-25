@@ -64,6 +64,7 @@
               <input data-tj-helper-session-summary-enabled type="checkbox" style="margin:0;" />
             </label>
             <div data-tj-helper-session-tracking-stats style="margin-top:8px;color:#D6EEF5;"></div>
+            <button type="button" data-tj-helper-session-history-open style="margin-top:8px;width:100%;border:1px solid #74A7B9;background:#294655;color:#fff;border-radius:4px;padding:5px;cursor:pointer;">Detailed history</button>
           </section>
           <div style="border-top:1px solid rgba(191,231,241,.22);padding-top:8px;">
             <div style="margin-bottom:6px;color:#E9F7FA;font-weight:700;">Status</div>
@@ -81,6 +82,7 @@
       const customOutgoingLanguageInput = statusPanel.querySelector("[data-tj-helper-custom-outgoing-language]");
       const messageTimestampsInput = statusPanel.querySelector("[data-tj-helper-message-timestamps-enabled]");
       const sessionSummaryInput = statusPanel.querySelector("[data-tj-helper-session-summary-enabled]");
+      const sessionHistoryOpenButton = statusPanel.querySelector("[data-tj-helper-session-history-open]");
 
       for (const [value, label] of LANGUAGE_OPTIONS) {
         const option = document.createElement("option");
@@ -126,6 +128,8 @@
       sessionSummaryInput.addEventListener("change", () => {
         setSessionSummaryEnabled(sessionSummaryInput.checked);
       });
+
+      sessionHistoryOpenButton.addEventListener("click", openSessionHistoryPanel);
     }
 
     const targetLanguage = getTargetLanguage();

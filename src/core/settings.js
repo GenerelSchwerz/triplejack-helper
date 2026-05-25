@@ -123,6 +123,14 @@
         sessionSummaryPanel = null;
       }
 
+      if (sessionHistoryPanel && !sessionHistoryPanel.contains(target) && !target?.closest?.("[data-tj-helper-session-history-open]")) {
+        closeSessionHistoryPanel();
+      }
+
+      if (sessionHistoryPanel?.contains(target)) {
+        return;
+      }
+
       if (!state.panelVisible || !statusPanel || statusPanel.contains(target)) {
         return;
       }

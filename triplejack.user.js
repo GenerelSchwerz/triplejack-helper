@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Triplejack Helper
 // @namespace    https://triplejack.com/
-// @version      0.6.29
+// @version      0.7.0
 // @description  Adds Triplejack chat translation, message tools, and session tracking helpers.
 // @author       Rocco A.
 // @license      MIT
@@ -1300,8 +1300,8 @@
       clearHelperPanelWidth(panelContainer);
       clearNativeStageWidthStyle();
       if (panelContainer.dataset.tjHelperPanelContainer || panelRegion.dataset.tjHelperPanelRegion) {
-        setPanelWidthStyle(panelRegion, HELPER_PANEL_WIDTH);
-        setPanelWidthStyle(panelContainer, HELPER_PANEL_WIDTH);
+        setPanelRegionWidthStyle(panelRegion, HELPER_PANEL_WIDTH);
+        setPanelContainerWidthStyle(panelContainer, HELPER_PANEL_WIDTH);
         setNativeStageWidthStyle(HELPER_PANEL_WIDTH);
       }
       scheduleLayoutRefresh();
@@ -1310,10 +1310,12 @@
 
     const panelWidth = getResolvedHelperPanelWidth();
     setNativeStageWidthStyle(panelWidth);
-    setPanelWidthStyle(panelRegion, panelWidth);
-    setPanelWidthStyle(panelContainer, panelWidth);
+    setPanelRegionWidthStyle(panelRegion, panelWidth);
+    setPanelContainerWidthStyle(panelContainer, panelWidth);
     for (const child of panelContainer.children) {
-      setPanelFillStyle(child);
+      if (child.matches?.("[data-tj-helper-panel-wrapper]")) {
+        setPanelFillStyle(child);
+      }
     }
     syncNativePanelGeometry();
     scheduleLayoutRefresh();
@@ -1330,13 +1332,25 @@
     }
   }
 
-  function setPanelWidthStyle(element, panelWidth) {
+  function setPanelRegionWidthStyle(element, panelWidth) {
     if (!element?.style) {
       return;
     }
 
     element.style.setProperty("flex", `0 0 ${panelWidth}px`, "important");
     element.style.setProperty("flex-basis", `${panelWidth}px`, "important");
+    element.style.setProperty("width", `${panelWidth}px`, "important");
+    element.style.setProperty("min-width", `${panelWidth}px`, "important");
+    element.style.setProperty("max-width", `min(${panelWidth}px,calc(100vw - 64px))`, "important");
+  }
+
+  function setPanelContainerWidthStyle(element, panelWidth) {
+    if (!element?.style) {
+      return;
+    }
+
+    element.style.removeProperty("flex");
+    element.style.removeProperty("flex-basis");
     element.style.setProperty("width", `${panelWidth}px`, "important");
     element.style.setProperty("min-width", `${panelWidth}px`, "important");
     element.style.setProperty("max-width", `min(${panelWidth}px,calc(100vw - 64px))`, "important");

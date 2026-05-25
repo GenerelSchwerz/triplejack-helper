@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Triplejack Helper
 // @namespace    https://triplejack.com/
-// @version      0.6.16
+// @version      0.6.17
 // @description  Translates Triplejack public chat and direct messages using Google Translate requests.
 // @author       Rocco A.
 // @license      MIT
@@ -932,6 +932,7 @@
   let nativePanelWrapperClassName = "";
   let nativePanelAsideClassName = "";
   let pendingHelperPanelOpenId = 0;
+  let helperShellNativeButton = null;
 
   function isHelperPanelActive(panelId) {
     return state.activePanelId === panelId;
@@ -952,28 +953,47 @@
   }
 
   function openHelperPanel(panelId) {
-    const activeNativePanelButton = getActiveNativePanelButton();
-    if (!activeNativePanelButton) {
+    if (state.activePanelId && helperShellNativeButton?.isConnected) {
       setActiveHelperPanel(panelId);
       return;
     }
 
-    const panelContainer = document.querySelector('[data-testid="panel-container"]');
-    captureNativePanelClasses(panelContainer);
-    logPanelDebug("helper-panel-closing-native-before-open", {
+    const activeNativePanelButton = getActiveNativePanelButton();
+    if (activeNativePanelButton) {
+      const panelContainer = document.querySelector('[data-testid="panel-container"]');
+      captureNativePanelClasses(panelContainer);
+      helperShellNativeButton = activeNativePanelButton;
+      setActiveHelperPanel(panelId);
+      return;
+    }
+
+    const shellButton = getNativeShellPanelButton();
+    if (!shellButton) {
+      logPanelDebug("helper-panel-open-missing-native-shell", { panelId });
+      setActiveHelperPanel(panelId);
+      return;
+    }
+
+    logPanelDebug("helper-panel-opening-native-shell", {
       panelId,
-      nativeTitle: activeNativePanelButton.title || "",
-      nativeAriaLabel: activeNativePanelButton.getAttribute("aria-label") || "",
+      nativeTitle: shellButton.title || "",
+      nativeAriaLabel: shellButton.getAttribute("aria-label") || "",
     });
-    dispatchNativePanelPointerDown(activeNativePanelButton);
-    waitForNativePanelClose(() => {
+    dispatchNativePanelPointerDown(shellButton);
+    waitForNativePanelOpen(shellButton, () => {
+      helperShellNativeButton = getActiveNativePanelButton() || shellButton;
       setActiveHelperPanel(panelId);
     });
   }
 
   function closeHelperPanels() {
     pendingHelperPanelOpenId += 1;
+    const shellButton = helperShellNativeButton;
     setActiveHelperPanel("");
+    if (shellButton?.isConnected) {
+      dispatchNativePanelPointerDown(shellButton);
+    }
+    helperShellNativeButton = null;
   }
 
   function setActiveHelperPanel(panelId) {
@@ -992,7 +1012,7 @@
     });
 
     if (!state.activePanelId) {
-      removeHelperPanelHost();
+      removeHelperPanelHost({ preservePanelShell: Boolean(helperShellNativeButton) });
     } else {
       getHelperPanelMount();
     }
@@ -1000,6 +1020,7 @@
     renderStatusPanel();
     renderSessionHistoryPanel();
     renderToolbarButtons();
+    syncNativePanelButtonsForHelper();
   }
 
   function getHelperPanelMount() {
@@ -1031,6 +1052,12 @@
     const nativeWrapper = panelContainer.querySelector(":scope > div:not([data-tj-helper-panel-wrapper])");
     const nativeAside = panelContainer.querySelector("aside.scaling-panel-container");
     captureNativePanelClasses(panelContainer);
+    for (const child of [...panelContainer.children]) {
+      if (!child.matches("[data-tj-helper-panel-wrapper]")) {
+        child.remove();
+      }
+    }
+
     const wrapper = document.createElement("div");
     wrapper.dataset.tjHelperPanelWrapper = "1";
     if (nativeWrapper?.className || nativePanelWrapperClassName) {
@@ -1201,16 +1228,35 @@
       title: nativePanelButton.title || "",
       ariaLabel: nativePanelButton.getAttribute("aria-label") || "",
     });
+    const clickedShellButton = nativePanelButton === helperShellNativeButton;
     pendingHelperPanelOpenId += 1;
     state.activePanelId = "";
-    removeHelperPanelHost({ preservePanelShell: false });
+    removeHelperPanelHost({ preservePanelShell: true });
+    helperShellNativeButton = null;
     renderToolbarButtons();
-    // Let the original pointerdown continue into the native React handler.
+    if (clickedShellButton) {
+      event.preventDefault();
+      event.stopPropagation();
+      event.stopImmediatePropagation?.();
+      dispatchNativePanelPointerDown(nativePanelButton);
+      window.requestAnimationFrame(() => {
+        dispatchNativePanelPointerDown(nativePanelButton);
+      });
+      return;
+    }
+    // Let other native panel pointerdowns continue into the native React handler.
   }
 
   function getActiveNativePanelButton() {
     return document.querySelector(
       'button[data-testid="panel button"][data-is-active="true"]:not([data-tj-helper-toolbar-button])',
+    );
+  }
+
+  function getNativeShellPanelButton() {
+    return (
+      document.querySelector('button[aria-label="Chat"][data-testid="panel button"]:not([data-tj-helper-toolbar-button])') ||
+      document.querySelector('button[data-testid="panel button"]:not([data-tj-helper-toolbar-button])')
     );
   }
 
@@ -1233,7 +1279,7 @@
     );
   }
 
-  function waitForNativePanelClose(callback) {
+  function waitForNativePanelOpen(shellButton, callback) {
     const openId = ++pendingHelperPanelOpenId;
     const startedAt = performance.now();
 
@@ -1244,11 +1290,11 @@
       }
 
       const panelContainer = document.querySelector('[data-testid="panel-container"]');
-      const nativePanelIsGone = !panelContainer || panelContainer.dataset.tjHelperPanelContainer;
-      if (nativePanelIsGone || performance.now() - startedAt > 600) {
-        logPanelDebug("helper-panel-native-close-wait-complete", {
+      if (panelContainer || performance.now() - startedAt > 600) {
+        logPanelDebug("helper-panel-native-open-wait-complete", {
           openId,
-          nativePanelIsGone,
+          hasPanelContainer: Boolean(panelContainer),
+          shellStillActive: shellButton?.hasAttribute?.("data-is-active") || false,
           elapsedMs: Math.round(performance.now() - startedAt),
         });
         callback();
@@ -1259,6 +1305,26 @@
     };
 
     window.requestAnimationFrame(wait);
+  }
+
+  function syncNativePanelButtonsForHelper() {
+    if (!state.activePanelId || !helperShellNativeButton?.isConnected) {
+      return;
+    }
+
+    const nativeButton = helperShellNativeButton;
+    const toolbar = nativeButton.parentElement;
+    const inactiveNativeButton = toolbar?.querySelector(
+      'button[data-testid="panel button"]:not([data-is-active="true"]):not([data-tj-helper-toolbar-button])',
+    );
+    if (inactiveNativeButton?.className) {
+      nativeButton.className = inactiveNativeButton.className;
+    }
+    nativeButton.removeAttribute("data-is-active");
+    delete nativeButton.dataset.isActive;
+    if (nativeButton.title?.startsWith("Hide ")) {
+      nativeButton.title = nativeButton.title.replace(/^Hide /, "Show ");
+    }
   }
 
   function scheduleLayoutRefresh() {

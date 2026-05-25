@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Triplejack Helper
 // @namespace    https://triplejack.com/
-// @version      0.6.8
+// @version      0.6.9
 // @description  Translates Triplejack public chat and direct messages using Google Translate requests.
 // @author       Rocco A.
 // @license      MIT
@@ -74,7 +74,7 @@
   let timestampRenderQueued = false;
 
   function logPanelDebug(action, details = {}) {
-    console.debug(PANEL_DEBUG_LOG_PREFIX, action, details);
+    console.log(PANEL_DEBUG_LOG_PREFIX, action, details);
   }
 
   // Translation protocol
@@ -1304,6 +1304,10 @@
 
   // Toolbar
   function installToolbarButton() {
+    logPanelDebug("install-toolbar-button", {
+      readyState: document.readyState,
+    });
+
     const observer = new MutationObserver(() => {
       renderToolbarButtons();
     });
@@ -1313,9 +1317,11 @@
       subtree: true,
     });
 
-    document.addEventListener("DOMContentLoaded", renderToolbarButtons, { once: true });
-    document.addEventListener("click", handleHelperToolbarButtonClick, true);
+    window.addEventListener("pointerdown", handleHelperToolbarPointerProbe, true);
+    window.addEventListener("mousedown", handleHelperToolbarPointerProbe, true);
+    window.addEventListener("click", handleHelperToolbarButtonClick, true);
     document.addEventListener("click", handleNativePanelButtonClick, true);
+    document.addEventListener("DOMContentLoaded", renderToolbarButtons, { once: true });
     window.addEventListener("load", renderToolbarButtons, { once: true });
 
     for (const delay of [0, 250, 1000, 2500]) {
@@ -1324,6 +1330,8 @@
   }
 
   function renderToolbarButtons() {
+    let insertedCount = 0;
+
     for (const toolbar of findPanelToolbars()) {
       if (!toolbar) {
         continue;
@@ -1341,6 +1349,7 @@
 
         const helperButton = buildToolbarButton(toolbar, insertTarget, item);
         toolbar.insertBefore(helperButton, insertTarget);
+        insertedCount += 1;
       }
     }
 
@@ -1352,6 +1361,13 @@
         helperButton.className = helperButton.dataset.tjHelperInactiveClass || helperButton.className;
         delete helperButton.dataset.isActive;
       }
+    }
+
+    if (insertedCount) {
+      logPanelDebug("helper-toolbar-buttons-inserted", {
+        insertedCount,
+        totalHelperButtons: document.querySelectorAll("[data-tj-helper-toolbar-button]").length,
+      });
     }
   }
 
@@ -1380,6 +1396,21 @@
         ].join(","),
       ) || toolbar.querySelector('button[data-testid="panel button"]')
     );
+  }
+
+  function handleHelperToolbarPointerProbe(event) {
+    const helperButton = event.target?.closest?.("[data-tj-helper-toolbar-button]");
+    if (!helperButton) {
+      return;
+    }
+
+    logPanelDebug("helper-toolbar-pointer-event", {
+      type: event.type,
+      panelId: helperButton.dataset.tjHelperToolbarButton,
+      activePanelId: state.activePanelId,
+      eventPhase: event.eventPhase,
+      targetTagName: event.target?.tagName || "",
+    });
   }
 
   function handleHelperToolbarButtonClick(event) {
@@ -1428,9 +1459,6 @@
     helperButton.type = "button";
     helperButton.title = item.title;
     helperButton.className = referenceButton.className;
-    helperButton.style.background = "transparent";
-    helperButton.style.paddingLeft = "5px";
-    helperButton.style.paddingRight = "5px";
     helperButton.dataset.tjHelperInactiveClass = referenceButton.className;
     helperButton.dataset.tjHelperActiveClass =
       activeButton?.className || insertTarget.className || referenceButton.className;

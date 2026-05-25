@@ -207,11 +207,24 @@
         labels: chartPoints.map((point) => point.label),
         datasets: [
           {
+            label: "Zero",
+            data: chartPoints.map(() => 0),
+            borderColor: "rgba(245,250,252,.46)",
+            borderWidth: 2,
+            pointRadius: 0,
+            pointHitRadius: 0,
+            tension: 0,
+            fill: false,
+            yAxisID: "results",
+            order: 2,
+          },
+          {
             label: chartMode.label,
-            data: chartPoints.map((point) => point[chartMode.valueKey]),
+            data: chartPoints.map((point) => getFiniteHistoryChartValue(point[chartMode.valueKey])),
             borderColor: chartMode.color,
             backgroundColor: chartMode.color,
-            borderWidth: 2,
+            borderWidth: 3,
+            clip: false,
             pointBackgroundColor(context) {
               const value = Number(context.raw);
               if (!Number.isFinite(value)) {
@@ -222,19 +235,28 @@
             },
             pointBorderColor: "#111820",
             pointBorderWidth: 1,
-            pointRadius: 4,
-            pointHoverRadius: 6,
-            pointHitRadius: 8,
+            pointRadius: 5,
+            pointHoverRadius: 7,
+            pointHitRadius: 10,
             spanGaps: true,
-            tension: 0.3,
+            tension: 0.2,
             fill: false,
             yAxisID: "results",
+            order: 1,
           },
         ],
       },
       options: {
         responsive: true,
         maintainAspectRatio: false,
+        layout: {
+          padding: {
+            top: 12,
+            right: 8,
+            bottom: 0,
+            left: 0,
+          },
+        },
         interaction: {
           mode: "index",
           intersect: false,
@@ -252,6 +274,9 @@
             },
           },
           tooltip: {
+            filter(context) {
+              return context.dataset.label !== "Zero";
+            },
             callbacks: {
               title(context) {
                 return chartPoints[context[0]?.dataIndex]?.tooltipLabel || "";
@@ -282,12 +307,12 @@
             ticks: {
               color: "#8FB8C4",
               callback(value) {
-                return formatHistoryChartValue(value, chartMode);
+                return formatHistoryChartAxisValue(value);
               },
             },
             grid: {
               color(context) {
-                return Number(context.tick.value) === 0 ? "rgba(245,250,252,.42)" : "rgba(191,231,241,.12)";
+                return Number(context.tick.value) === 0 ? "rgba(245,250,252,.52)" : "rgba(191,231,241,.12)";
               },
               lineWidth(context) {
                 return Number(context.tick.value) === 0 ? 2 : 1;
@@ -462,6 +487,28 @@
     }
 
     return `${number >= 0 ? "+" : ""}${number.toFixed(1)}${chartMode.suffix}`;
+  }
+
+  function formatHistoryChartAxisValue(value) {
+    const number = Number(value);
+    if (!Number.isFinite(number)) {
+      return "0";
+    }
+
+    if (Math.abs(number) >= 1000) {
+      return `${Math.round(number / 100) / 10}k`;
+    }
+
+    if (Math.abs(number) >= 100) {
+      return String(Math.round(number));
+    }
+
+    return number.toFixed(1);
+  }
+
+  function getFiniteHistoryChartValue(value) {
+    const number = Number(value);
+    return Number.isFinite(number) ? number : 0;
   }
 
   function formatHistoryChartPointLabel(session, previousSession) {

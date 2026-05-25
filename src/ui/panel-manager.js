@@ -143,6 +143,7 @@
       "align-items:stretch",
       "flex:1 1 auto",
       "position:relative",
+      "overflow:hidden",
     ].join(";");
 
     const resizeHandle = createHelperPanelResizeHandle();
@@ -262,6 +263,7 @@
       "display:flex",
       "align-items:stretch",
       "align-self:stretch",
+      "overflow:hidden",
       `flex:0 1 ${panelWidth}px`,
       `max-width:min(${panelWidth}px,calc(100vw - 64px))`,
     ].join(";");
@@ -275,6 +277,7 @@
       "min-height:0",
       "display:flex",
       "align-items:stretch",
+      "overflow:hidden",
     ].join(";");
 
     panelRegion.appendChild(panelContainer);
@@ -291,10 +294,9 @@
     resizeHandle.setAttribute("role", "separator");
     resizeHandle.setAttribute("aria-orientation", "vertical");
     resizeHandle.style.cssText = [
-      "position:absolute",
-      "left:-14px",
+      "position:fixed",
+      "left:0",
       "top:0",
-      "bottom:0",
       "height:100%",
       "width:24px",
       "z-index:20",
@@ -371,8 +373,9 @@
     setPanelWidthStyle(panelRegion, panelWidth);
     setPanelWidthStyle(panelContainer, panelWidth);
     for (const child of panelContainer.children) {
-      setPanelWidthStyle(child, panelWidth);
+      setPanelFillStyle(child);
     }
+    syncNativePanelGeometry();
     scheduleLayoutRefresh();
   }
 
@@ -397,9 +400,27 @@
     element.style.setProperty("width", `${panelWidth}px`, "important");
     element.style.setProperty("min-width", `${panelWidth}px`, "important");
     element.style.setProperty("max-width", `min(${panelWidth}px,calc(100vw - 64px))`, "important");
-    element.style.setProperty("height", "100%", "important");
+    const stageHeight = getNativeStageHeight();
+    element.style.setProperty("height", stageHeight ? `${stageHeight}px` : "100%", "important");
     element.style.setProperty("min-height", "0", "important");
     element.style.setProperty("align-self", "stretch", "important");
+    element.style.setProperty("overflow", "hidden", "important");
+  }
+
+  function setPanelFillStyle(element) {
+    if (!element?.style) {
+      return;
+    }
+
+    const stageHeight = getNativeStageHeight();
+    element.style.setProperty("flex", "1 1 auto", "important");
+    element.style.setProperty("width", "100%", "important");
+    element.style.setProperty("min-width", "0", "important");
+    element.style.setProperty("max-width", "100%", "important");
+    element.style.setProperty("height", stageHeight ? `${stageHeight}px` : "100%", "important");
+    element.style.setProperty("min-height", "0", "important");
+    element.style.setProperty("align-self", "stretch", "important");
+    element.style.setProperty("overflow", "hidden", "important");
   }
 
   function getResolvedHelperPanelWidth() {
@@ -411,20 +432,33 @@
       return;
     }
 
-    for (const property of ["flex", "flex-basis", "width", "min-width", "max-width", "height", "min-height", "align-self"]) {
+    for (const property of [
+      "flex",
+      "flex-basis",
+      "width",
+      "min-width",
+      "max-width",
+      "height",
+      "min-height",
+      "align-self",
+      "overflow",
+    ]) {
       element.style.removeProperty(property);
     }
   }
 
   function refreshNativeLayoutAfterPanelWidthChange() {
     applyHelperPanelWidth();
+    syncNativePanelGeometry();
     resizeNativeStageToContainer();
     scheduleLayoutRefresh();
     window.requestAnimationFrame(() => {
+      syncNativePanelGeometry();
       resizeNativeStageToContainer();
       scheduleLayoutRefresh();
     });
     window.setTimeout(() => {
+      syncNativePanelGeometry();
       resizeNativeStageToContainer();
       scheduleLayoutRefresh();
     }, 120);
@@ -433,6 +467,7 @@
   function scheduleNativePanelWidthApply() {
     const refresh = () => {
       applyHelperPanelWidth();
+      syncNativePanelGeometry();
       resizeNativeStageToContainer();
       scheduleLayoutRefresh();
     };
@@ -577,10 +612,47 @@
   function scheduleLayoutRefresh() {
     window.dispatchEvent(new Event("resize"));
     window.requestAnimationFrame(() => {
+      syncNativePanelGeometry();
       resizeNativeStageToContainer();
       window.dispatchEvent(new Event("resize"));
       sessionHistoryChart?.resize?.();
     });
+  }
+
+  function syncNativePanelGeometry() {
+    const panelContainer = document.querySelector('[data-testid="panel-container"]');
+    const panelRegion = panelContainer?.parentElement;
+    if (!panelContainer || !panelRegion) {
+      return;
+    }
+
+    const stageHeight = getNativeStageHeight();
+    if (stageHeight > 0) {
+      panelRegion.style.setProperty("height", `${stageHeight}px`, "important");
+      panelContainer.style.setProperty("height", `${stageHeight}px`, "important");
+      for (const child of panelContainer.children) {
+        child.style.setProperty("height", `${stageHeight}px`, "important");
+      }
+    }
+
+    positionHelperPanelResizeHandle(panelRegion, stageHeight);
+  }
+
+  function positionHelperPanelResizeHandle(panelRegion, stageHeight = getNativeStageHeight()) {
+    const resizeHandle = document.querySelector("[data-tj-helper-panel-resize-handle]");
+    if (!resizeHandle || !panelRegion) {
+      return;
+    }
+
+    const panelRect = panelRegion.getBoundingClientRect();
+    resizeHandle.style.left = `${Math.round(panelRect.left - 14)}px`;
+    resizeHandle.style.top = `${Math.round(panelRect.top)}px`;
+    resizeHandle.style.height = `${Math.round(stageHeight || panelRect.height || 0)}px`;
+  }
+
+  function getNativeStageHeight() {
+    const stageContainer = document.querySelector('[data-testid="poker-stage-container"]');
+    return Math.round(stageContainer?.clientHeight || stageContainer?.getBoundingClientRect?.().height || 0);
   }
 
   function resizeNativeStageToContainer() {
@@ -603,6 +675,12 @@
     }
     if (canvas.height !== height) {
       canvas.height = height;
+    }
+
+    const statusOverlay = document.querySelector('section[aria-label="table status"]')?.parentElement;
+    if (statusOverlay?.style) {
+      statusOverlay.style.width = `${width}px`;
+      statusOverlay.style.height = `${height}px`;
     }
   }
 

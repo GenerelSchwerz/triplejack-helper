@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Triplejack Helper
 // @namespace    https://triplejack.com/
-// @version      0.6.21
+// @version      0.6.22
 // @description  Adds Triplejack chat translation, message tools, and session tracking helpers.
 // @author       Rocco A.
 // @license      MIT
@@ -2225,15 +2225,20 @@
     const chartPoints = chronologicalSessions.map((session, index) => {
       cumulativeBigBlinds += Number(session.bigBlindDelta) || 0;
       return {
-        x: normalizeHistoryChartTime(session.endedAt, chronologicalSessions, index),
-        label: formatHistoryDateTime(session.endedAt),
+        label: formatHistoryChartPointLabel(session, chronologicalSessions[index - 1]),
+        tooltipLabel: formatHistoryDateTime(session.endedAt),
         endedAt: session.endedAt,
         netBigBlinds: Number(session.bigBlindDelta) || 0,
-        bbPerHour: Number.isFinite(Number(session.bigBlindsPerHour)) ? Number(session.bigBlindsPerHour) : null,
+        bbPerHour: getSessionBigBlindsPerHour(session),
         cumulativeBigBlinds,
       };
     });
     const chartMode = getSessionHistoryChartModeConfig();
+    const chartValues = chartPoints
+      .map((point) => point[chartMode.valueKey])
+      .filter((value) => Number.isFinite(Number(value)))
+      .map(Number);
+    const yLimit = getHistoryChartYAxisLimit(chartValues);
     const chartTitle = sessionHistoryPanel.querySelector("[data-tj-session-history-chart-title]");
     if (chartTitle) {
       chartTitle.textContent = chartMode.title;
@@ -2242,19 +2247,13 @@
     sessionHistoryChart = new ChartConstructor(chartElement, {
       type: "line",
       data: {
+        labels: chartPoints.map((point) => point.label),
         datasets: [
           {
             label: chartMode.label,
-            data: chartPoints.map((point) => {
-              return {
-                x: point.x,
-                y: point[chartMode.valueKey],
-                label: point.label,
-                endedAt: point.endedAt,
-              };
-            }),
+            data: chartPoints.map((point) => point[chartMode.valueKey]),
             borderColor: chartMode.color,
-            backgroundColor: chartMode.fillColor,
+            backgroundColor: chartMode.color,
             borderWidth: 2,
             pointBackgroundColor(context) {
               const value = Number(context.raw);
@@ -2271,7 +2270,7 @@
             pointHitRadius: 8,
             spanGaps: true,
             tension: 0.3,
-            fill: true,
+            fill: false,
             yAxisID: "results",
           },
         ],
@@ -2298,7 +2297,7 @@
           tooltip: {
             callbacks: {
               title(context) {
-                return context[0]?.raw?.label || "";
+                return chartPoints[context[0]?.dataIndex]?.tooltipLabel || "";
               },
               label(context) {
                 return `${context.dataset.label}: ${formatHistoryChartValue(context.parsed.y, chartMode)}`;
@@ -2308,17 +2307,12 @@
         },
         scales: {
           x: {
-            type: "linear",
-            min: 0,
-            max: 1,
+            offset: chartPoints.length === 1,
             ticks: {
               color: "#8FB8C4",
               maxRotation: 0,
               autoSkip: true,
-              maxTicksLimit: 5,
-              callback(value) {
-                return formatHistoryChartTimeTick(value, chartPoints);
-              },
+              maxTicksLimit: Math.min(6, Math.max(chartPoints.length, 2)),
             },
             grid: {
               color: "rgba(191,231,241,.08)",
@@ -2326,6 +2320,8 @@
           },
           results: {
             beginAtZero: true,
+            min: -yLimit,
+            max: yLimit,
             ticks: {
               color: "#8FB8C4",
               callback(value) {
@@ -2333,7 +2329,12 @@
               },
             },
             grid: {
-              color: "rgba(191,231,241,.12)",
+              color(context) {
+                return Number(context.tick.value) === 0 ? "rgba(245,250,252,.42)" : "rgba(191,231,241,.12)";
+              },
+              lineWidth(context) {
+                return Number(context.tick.value) === 0 ? 2 : 1;
+              },
             },
           },
         },
@@ -2497,19 +2498,6 @@
     return Number(value) >= 0 ? "#A7D8AD" : "#FFB0A8";
   }
 
-  function formatHistoryAxisValue(value) {
-    const number = Number(value);
-    if (!Number.isFinite(number)) {
-      return "0";
-    }
-
-    if (Math.abs(number) >= 100) {
-      return String(Math.round(number));
-    }
-
-    return number.toFixed(1);
-  }
-
   function formatHistoryChartValue(value, chartMode) {
     const number = Number(value);
     if (!Number.isFinite(number)) {
@@ -2519,34 +2507,47 @@
     return `${number >= 0 ? "+" : ""}${number.toFixed(1)}${chartMode.suffix}`;
   }
 
-  function formatHistoryChartTickLabel(label) {
-    const text = String(label || "");
-    return text.length > 12 ? `${text.slice(0, 11)}...` : text;
+  function formatHistoryChartPointLabel(session, previousSession) {
+    const dateLabel = new Date(session.endedAt).toLocaleDateString([], {
+      month: "numeric",
+      day: "numeric",
+    });
+    const timeLabel = new Date(session.endedAt).toLocaleTimeString([], {
+      hour: "numeric",
+      minute: "2-digit",
+    });
+    const previousDateLabel = previousSession
+      ? new Date(previousSession.endedAt).toLocaleDateString([], {
+          month: "numeric",
+          day: "numeric",
+        })
+      : "";
+
+    if (!previousSession || previousDateLabel !== dateLabel) {
+      return `${dateLabel}, ${timeLabel}`;
+    }
+
+    return timeLabel;
   }
 
-  function formatHistoryChartTimeTick(value, chartPoints) {
-    if (!chartPoints.length) {
-      return "";
+  function getSessionBigBlindsPerHour(session) {
+    const savedValue = Number(session.bigBlindsPerHour);
+    if (Number.isFinite(savedValue)) {
+      return savedValue;
     }
 
-    const closestPoint = chartPoints.reduce((closest, point) => {
-      return Math.abs(point.x - value) < Math.abs(closest.x - value) ? point : closest;
-    }, chartPoints[0]);
-    return formatHistoryChartTickLabel(closestPoint.label);
+    const bigBlindDelta = Number(session.bigBlindDelta);
+    const durationMs = Number(session.durationMs);
+    if (!Number.isFinite(bigBlindDelta) || !Number.isFinite(durationMs) || durationMs <= 0) {
+      return null;
+    }
+
+    return bigBlindDelta / (durationMs / 3600000);
   }
 
-  function normalizeHistoryChartTime(timestamp, sessions, index) {
-    if (sessions.length < 2) {
-      return 0.5;
-    }
-
-    const firstTime = sessions[0].endedAt;
-    const lastTime = sessions[sessions.length - 1].endedAt;
-    if (firstTime === lastTime) {
-      return sessions.length === 1 ? 0.5 : index / (sessions.length - 1);
-    }
-
-    return (timestamp - firstTime) / (lastTime - firstTime);
+  function getHistoryChartYAxisLimit(values) {
+    const maxMagnitude = Math.max(1, ...values.map((value) => Math.abs(value)));
+    return maxMagnitude * 1.18;
   }
 
   function getChartConstructor() {

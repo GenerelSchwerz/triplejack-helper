@@ -15,7 +15,7 @@
     window.addEventListener("pointerdown", handleHelperToolbarPointerProbe, true);
     window.addEventListener("mousedown", handleHelperToolbarPointerProbe, true);
     window.addEventListener("click", handleHelperToolbarButtonClick, true);
-    document.addEventListener("click", handleNativePanelButtonClick, true);
+    window.addEventListener("click", handleNativePanelButtonClick, true);
     document.addEventListener("DOMContentLoaded", renderToolbarButtons, { once: true });
     window.addEventListener("load", renderToolbarButtons, { once: true });
 
@@ -26,10 +26,6 @@
 
   function renderToolbarButtons() {
     let insertedCount = 0;
-
-    if (state.activePanelId) {
-      deactivateNativePanelsForHelper();
-    }
 
     for (const toolbar of findPanelToolbars()) {
       if (!toolbar) {
@@ -60,6 +56,7 @@
         helperButton.className = helperButton.dataset.tjHelperInactiveClass || helperButton.className;
         delete helperButton.dataset.isActive;
         helperButton.removeAttribute("data-is-active");
+        helperButton.blur();
       }
     }
 

@@ -130,8 +130,16 @@
   }
 
   function removeHelperPanelHost(options = {}) {
+    const helperRoots = new Set(document.querySelectorAll("[data-tj-helper-panel-wrapper]"));
     const hostRoot = helperPanelHost?.closest?.("[data-tj-helper-panel-wrapper]") || helperPanelHost;
-    hostRoot?.remove();
+    if (hostRoot) {
+      helperRoots.add(hostRoot);
+    }
+
+    for (const helperRoot of helperRoots) {
+      helperRoot.remove();
+    }
+
     helperPanelHost = null;
     if (!options.preservePanelShell) {
       removeEmptyHelperPanelRegion();
@@ -140,13 +148,17 @@
 
   function removeEmptyHelperPanelRegion() {
     const panelContainer = document.querySelector('[data-testid="panel-container"]');
-    if (!panelContainer || panelContainer.children.length) {
+    if (!panelContainer) {
       return;
     }
 
     const panelRegion = panelContainer.parentElement;
     if (panelContainer.dataset.tjHelperPanelContainer || panelRegion?.dataset.tjHelperPanelRegion) {
       panelRegion?.remove();
+      return;
+    }
+
+    if (panelContainer.children.length) {
       return;
     }
 
@@ -281,7 +293,7 @@
     event.preventDefault();
     event.stopPropagation();
     event.stopImmediatePropagation?.();
-    logPanelDebug("native-panel-click-clears-helper-panel", {
+    logPanelDebug("native-panel-click-switches-from-helper", {
       activePanelId: state.activePanelId,
       title: nativePanelButton.title || "",
       ariaLabel: nativePanelButton.getAttribute("aria-label") || "",
@@ -290,9 +302,6 @@
     showNativePanelContainer(document.querySelector('[data-testid="panel-container"]'));
     removeHelperPanelHost({ preservePanelShell: true });
     renderToolbarButtons();
-    for (const helperButton of document.querySelectorAll("[data-tj-helper-toolbar-button]")) {
-      helperButton.blur();
-    }
     replayNativePanelClick(nativePanelButton);
   }
 

@@ -1,4 +1,4 @@
-  function pageTranslationControllerModule(config, messageProtocol, translationRenderer) {
+  function translationControllerModule(config, messageProtocol, translationRenderer) {
     const pendingRequests = new Map();
     const pendingOutgoingRequests = new Map();
     const state = {

@@ -1,4 +1,4 @@
-  function pageTranslationRendererModule(translatedMarker) {
+  function translationRendererModule(translatedMarker) {
     function buildOutgoingMessageData(outgoingMessage, translatedText) {
       if (!translatedText) {
         return outgoingMessage.originalData;

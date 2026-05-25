@@ -18,7 +18,7 @@
     }
 
     function install() {
-      if (window.__triplejackTranslateWebSocketHookInstalled) {
+      if (window.__triplejackHelperWebSocketHookInstalled) {
         setStatus("WebSocket hook already installed");
         return;
       }
@@ -28,7 +28,7 @@
         return;
       }
 
-      window.__triplejackTranslateWebSocketHookInstalled = true;
+      window.__triplejackHelperWebSocketHookInstalled = true;
 
       window.WebSocket = new Proxy(NativeWebSocket, {
         construct(Target, args) {

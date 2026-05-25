@@ -18,7 +18,7 @@
 
   function renderToolbarButtons() {
     for (const toolbar of findPanelToolbars()) {
-      if (!toolbar || toolbar.querySelector("[data-tj-helper-toolbar-button]")) {
+      if (!toolbar) {
         continue;
       }
 
@@ -27,12 +27,18 @@
         continue;
       }
 
-      const helperButton = buildToolbarButton(toolbar, insertTarget);
-      toolbar.insertBefore(helperButton, insertTarget);
+      for (const item of getHelperToolbarItems()) {
+        if (toolbar.querySelector(`[data-tj-helper-toolbar-button="${item.id}"]`)) {
+          continue;
+        }
+
+        const helperButton = buildToolbarButton(toolbar, insertTarget, item);
+        toolbar.insertBefore(helperButton, insertTarget);
+      }
     }
 
     for (const helperButton of document.querySelectorAll("[data-tj-helper-toolbar-button]")) {
-      if (state.panelVisible) {
+      if (state.activePanelId === helperButton.dataset.tjHelperToolbarButton) {
         helperButton.className = helperButton.dataset.tjHelperActiveClass || helperButton.className;
         helperButton.dataset.isActive = "true";
       } else {
@@ -69,7 +75,22 @@
     );
   }
 
-  function buildToolbarButton(toolbar, insertTarget) {
+  function getHelperToolbarItems() {
+    return [
+      {
+        id: SETTINGS_PANEL_ID,
+        title: "Triplejack Helper Settings",
+        label: "T",
+      },
+      {
+        id: SESSION_HISTORY_PANEL_ID,
+        title: "Session History",
+        label: "BB",
+      },
+    ];
+  }
+
+  function buildToolbarButton(toolbar, insertTarget, item) {
     const referenceButton =
       toolbar.querySelector('button[data-testid="panel button"]:not([data-is-active="true"])') || insertTarget;
     const outerClassName = referenceButton.firstElementChild?.className || "";
@@ -79,7 +100,7 @@
     const activeButton = toolbar.querySelector('button[data-testid="panel button"][data-is-active="true"]');
 
     helperButton.type = "button";
-    helperButton.title = "Translate Settings";
+    helperButton.title = item.title;
     helperButton.className = referenceButton.className;
     helperButton.style.background = "transparent";
     helperButton.style.paddingLeft = "5px";
@@ -87,13 +108,13 @@
     helperButton.dataset.tjHelperInactiveClass = referenceButton.className;
     helperButton.dataset.tjHelperActiveClass =
       activeButton?.className || insertTarget.className || referenceButton.className;
-    helperButton.dataset.tjHelperToolbarButton = "1";
+    helperButton.dataset.tjHelperToolbarButton = item.id;
     helperButton.setAttribute("data-testid", "panel button");
-    helperButton.setAttribute("aria-label", "Translate Settings");
+    helperButton.setAttribute("aria-label", item.title);
     helperButton.innerHTML = `
       <div class="${escapeAttribute(outerClassName)}">
         <div data-testid="icon-scale-wrapper" class="${escapeAttribute(iconWrapperClassName)}">
-          <span style="font:700 23px/1 Arial,sans-serif;color:currentColor;">T</span>
+          <span style="font:700 ${item.label.length > 1 ? "16px" : "23px"}/1 Arial,sans-serif;color:currentColor;letter-spacing:0;">${escapeAttribute(item.label)}</span>
         </div>
       </div>
     `;
@@ -101,7 +122,7 @@
     helperButton.addEventListener("click", (event) => {
       event.preventDefault();
       event.stopPropagation();
-      toggleStatusPanel();
+      toggleHelperPanel(item.id);
     });
 
     return helperButton;

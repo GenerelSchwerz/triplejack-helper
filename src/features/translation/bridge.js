@@ -1,4 +1,4 @@
-﻿  function log(...args) {
+  function log(...args) {
     console.log(`[${SCRIPT_NAME}]`, ...args);
   }
 
@@ -6,6 +6,11 @@
     state.lastStatus = status;
     log(status);
     renderStatusPanel();
+  }
+
+  function installTranslationFeature() {
+    installTranslationBridge();
+    injectTranslationPageModules();
   }
 
   function installTranslationBridge() {
@@ -91,12 +96,12 @@
     });
   }
 
-  function injectWebSocketHook() {
+  function injectTranslationPageModules() {
     const script = document.createElement("script");
     script.textContent = `(() => {
-      const messageProtocol = (${pageMessageProtocolModule.toString()})();
-      const translationRenderer = (${pageTranslationRendererModule.toString()})(messageProtocol.translatedMarker);
-      const translationController = (${pageTranslationControllerModule.toString()})(
+      const messageProtocol = (${translationProtocolModule.toString()})();
+      const translationRenderer = (${translationRendererModule.toString()})(messageProtocol.translatedMarker);
+      const translationController = (${translationControllerModule.toString()})(
         ${JSON.stringify({
       requestEvent: REQUEST_EVENT,
       responseEvent: RESPONSE_EVENT,
@@ -120,5 +125,5 @@
 
     (document.head || document.documentElement).appendChild(script);
     script.remove();
-    setStatus("page-context WebSocket hook injected");
+    setStatus("translation page modules injected");
   }

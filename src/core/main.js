@@ -1,7 +1,6 @@
 ﻿  function main() {
     GM_registerMenuCommand("Show Triplejack Helper status", () => {
-      state.panelVisible = true;
-      renderStatusPanel();
+      openHelperPanel(SETTINGS_PANEL_ID);
       alert(`${SCRIPT_NAME}\n${state.lastStatus}`);
     });
     GM_registerMenuCommand("Set Triplejack target language", promptForTargetLanguage);
@@ -11,10 +10,9 @@
     installToolbarButton();
     installMessageTimestamps();
     installSessionTracker();
-    installTranslationBridge();
-    injectWebSocketHook();
+    installTranslationFeature();
     setStatus("loaded");
-    renderStatusPanel();
+    renderHelperPanels();
   }
 
   main();

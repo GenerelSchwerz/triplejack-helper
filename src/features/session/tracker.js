@@ -281,7 +281,7 @@
     const summary = buildSessionSummary();
     if (summary) {
       persistSessionSummary(summary);
-      renderStatusPanel();
+      renderHelperPanels();
     }
     resetSessionTracker();
 

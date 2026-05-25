@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Triplejack Helper
 // @namespace    https://triplejack.com/
-// @version      0.6.0
+// @version      0.6.1
 // @description  Translates Triplejack public chat and direct messages using Google Translate requests.
 // @author       Rocco A.
 // @license      MIT
@@ -62,7 +62,7 @@
     chatsSeen: 0,
     translationsShown: 0,
     lastStatus: "starting",
-    panelVisible: false,
+    activePanelId: "",
   };
   let statusPanel;
   let sessionSummaryPanel;
@@ -71,8 +71,8 @@
   let timestampObserver;
   let timestampRenderQueued = false;
 
-  // Page message protocol
-  function pageMessageProtocolModule() {
+  // Translation protocol
+  function translationProtocolModule() {
     const TRANSLATED_MARKER = "data-tj-translated";
     const requestedPrivateMessageIds = new Set();
 
@@ -287,8 +287,8 @@
     };
   }
 
-  // Page translation renderer
-  function pageTranslationRendererModule(translatedMarker) {
+  // Translation renderer
+  function translationRendererModule(translatedMarker) {
     function buildOutgoingMessageData(outgoingMessage, translatedText) {
       if (!translatedText) {
         return outgoingMessage.originalData;
@@ -382,8 +382,8 @@
     };
   }
 
-  // Page translation controller
-  function pageTranslationControllerModule(config, messageProtocol, translationRenderer) {
+  // Translation controller
+  function translationControllerModule(config, messageProtocol, translationRenderer) {
     const pendingRequests = new Map();
     const pendingOutgoingRequests = new Map();
     const state = {
@@ -583,7 +583,7 @@
     }
 
     function install() {
-      if (window.__triplejackTranslateWebSocketHookInstalled) {
+      if (window.__triplejackHelperWebSocketHookInstalled) {
         setStatus("WebSocket hook already installed");
         return;
       }
@@ -593,7 +593,7 @@
         return;
       }
 
-      window.__triplejackTranslateWebSocketHookInstalled = true;
+      window.__triplejackHelperWebSocketHookInstalled = true;
 
       window.WebSocket = new Proxy(NativeWebSocket, {
         construct(Target, args) {
@@ -742,7 +742,54 @@
     install();
   }
 
-  // Userscript bridge
+  // Translation service
+  function translateText(text, targetLanguage) {
+    const trimmedText = text.trim();
+    const cacheKey = `${targetLanguage}:${trimmedText}`;
+    const cachedText = translationCache.get(cacheKey);
+    if (cachedText) {
+      return Promise.resolve(cachedText);
+    }
+
+    const url = new URL("https://translate.googleapis.com/translate_a/single");
+    url.searchParams.set("client", "gtx");
+    url.searchParams.set("sl", "auto");
+    url.searchParams.set("tl", targetLanguage);
+    url.searchParams.set("dt", "t");
+    url.searchParams.set("q", trimmedText);
+
+    return new Promise((resolve, reject) => {
+      GM_xmlhttpRequest({
+        method: "GET",
+        url: url.toString(),
+        onload(response) {
+          if (response.status < 200 || response.status >= 300) {
+            reject(new Error(`Google Translate returned HTTP ${response.status}`));
+            return;
+          }
+
+          try {
+            const payload = JSON.parse(response.responseText);
+            const translatedText = payload?.[0]?.map((part) => part?.[0] ?? "").join("").trim();
+            if (!translatedText) {
+              reject(new Error("Google Translate returned an empty translation"));
+              return;
+            }
+
+            translationCache.set(cacheKey, translatedText);
+            resolve(translatedText);
+          } catch (error) {
+            reject(error);
+          }
+        },
+        onerror() {
+          reject(new Error("Google Translate request failed"));
+        },
+      });
+    });
+  }
+
+  // Translation bridge
   function log(...args) {
     console.log(`[${SCRIPT_NAME}]`, ...args);
   }
@@ -751,6 +798,11 @@
     state.lastStatus = status;
     log(status);
     renderStatusPanel();
+  }
+
+  function installTranslationFeature() {
+    installTranslationBridge();
+    injectTranslationPageModules();
   }
 
   function installTranslationBridge() {
@@ -836,12 +888,12 @@
     });
   }
 
-  function injectWebSocketHook() {
+  function injectTranslationPageModules() {
     const script = document.createElement("script");
     script.textContent = `(() => {
-      const messageProtocol = (${pageMessageProtocolModule.toString()})();
-      const translationRenderer = (${pageTranslationRendererModule.toString()})(messageProtocol.translatedMarker);
-      const translationController = (${pageTranslationControllerModule.toString()})(
+      const messageProtocol = (${translationProtocolModule.toString()})();
+      const translationRenderer = (${translationRendererModule.toString()})(messageProtocol.translatedMarker);
+      const translationController = (${translationControllerModule.toString()})(
         ${JSON.stringify({
       requestEvent: REQUEST_EVENT,
       responseEvent: RESPONSE_EVENT,
@@ -865,54 +917,48 @@
 
     (document.head || document.documentElement).appendChild(script);
     script.remove();
-    setStatus("page-context WebSocket hook injected");
+    setStatus("translation page modules injected");
   }
 
-  // Translation service
-  function translateText(text, targetLanguage) {
-    const trimmedText = text.trim();
-    const cacheKey = `${targetLanguage}:${trimmedText}`;
-    const cachedText = translationCache.get(cacheKey);
-    if (cachedText) {
-      return Promise.resolve(cachedText);
+  // Panel manager
+  const SETTINGS_PANEL_ID = "settings";
+  const SESSION_HISTORY_PANEL_ID = "session-history";
+
+  function isHelperPanelActive(panelId) {
+    return state.activePanelId === panelId;
+  }
+
+  function toggleHelperPanel(panelId) {
+    state.activePanelId = state.activePanelId === panelId ? "" : panelId;
+    renderHelperPanels();
+  }
+
+  function openHelperPanel(panelId) {
+    state.activePanelId = panelId;
+    renderHelperPanels();
+  }
+
+  function closeHelperPanels() {
+    state.activePanelId = "";
+    renderHelperPanels();
+  }
+
+  function renderHelperPanels() {
+    renderStatusPanel();
+    renderSessionHistoryPanel();
+    renderToolbarButtons();
+  }
+
+  function getActiveHelperPanelElement() {
+    if (state.activePanelId === SETTINGS_PANEL_ID) {
+      return statusPanel;
     }
 
-    const url = new URL("https://translate.googleapis.com/translate_a/single");
-    url.searchParams.set("client", "gtx");
-    url.searchParams.set("sl", "auto");
-    url.searchParams.set("tl", targetLanguage);
-    url.searchParams.set("dt", "t");
-    url.searchParams.set("q", trimmedText);
+    if (state.activePanelId === SESSION_HISTORY_PANEL_ID) {
+      return sessionHistoryPanel;
+    }
 
-    return new Promise((resolve, reject) => {
-      GM_xmlhttpRequest({
-        method: "GET",
-        url: url.toString(),
-        onload(response) {
-          if (response.status < 200 || response.status >= 300) {
-            reject(new Error(`Google Translate returned HTTP ${response.status}`));
-            return;
-          }
-
-          try {
-            const payload = JSON.parse(response.responseText);
-            const translatedText = payload?.[0]?.map((part) => part?.[0] ?? "").join("").trim();
-            if (!translatedText) {
-              reject(new Error("Google Translate returned an empty translation"));
-              return;
-            }
-
-            translationCache.set(cacheKey, translatedText);
-            resolve(translatedText);
-          } catch (error) {
-            reject(error);
-          }
-        },
-        onerror() {
-          reject(new Error("Google Translate request failed"));
-        },
-      });
-    });
+    return null;
   }
 
   // Settings
@@ -1004,8 +1050,7 @@
   }
 
   function toggleStatusPanel() {
-    state.panelVisible = !state.panelVisible;
-    renderStatusPanel();
+    toggleHelperPanel(SETTINGS_PANEL_ID);
   }
 
   function installKeyboardShortcuts() {
@@ -1041,15 +1086,8 @@
         sessionSummaryPanel = null;
       }
 
-      if (sessionHistoryPanel && !sessionHistoryPanel.contains(target) && !target?.closest?.("[data-tj-helper-session-history-open]")) {
-        closeSessionHistoryPanel();
-      }
-
-      if (sessionHistoryPanel?.contains(target)) {
-        return;
-      }
-
-      if (!state.panelVisible || !statusPanel || statusPanel.contains(target)) {
+      const activePanel = getActiveHelperPanelElement();
+      if (activePanel?.contains(target)) {
         return;
       }
 
@@ -1057,8 +1095,11 @@
         return;
       }
 
-      state.panelVisible = false;
-      renderStatusPanel();
+      if (!state.activePanelId || !activePanel) {
+        return;
+      }
+
+      closeHelperPanels();
     });
   }
 
@@ -1083,7 +1124,7 @@
 
   function renderToolbarButtons() {
     for (const toolbar of findPanelToolbars()) {
-      if (!toolbar || toolbar.querySelector("[data-tj-helper-toolbar-button]")) {
+      if (!toolbar) {
         continue;
       }
 
@@ -1092,12 +1133,18 @@
         continue;
       }
 
-      const helperButton = buildToolbarButton(toolbar, insertTarget);
-      toolbar.insertBefore(helperButton, insertTarget);
+      for (const item of getHelperToolbarItems()) {
+        if (toolbar.querySelector(`[data-tj-helper-toolbar-button="${item.id}"]`)) {
+          continue;
+        }
+
+        const helperButton = buildToolbarButton(toolbar, insertTarget, item);
+        toolbar.insertBefore(helperButton, insertTarget);
+      }
     }
 
     for (const helperButton of document.querySelectorAll("[data-tj-helper-toolbar-button]")) {
-      if (state.panelVisible) {
+      if (state.activePanelId === helperButton.dataset.tjHelperToolbarButton) {
         helperButton.className = helperButton.dataset.tjHelperActiveClass || helperButton.className;
         helperButton.dataset.isActive = "true";
       } else {
@@ -1134,7 +1181,22 @@
     );
   }
 
-  function buildToolbarButton(toolbar, insertTarget) {
+  function getHelperToolbarItems() {
+    return [
+      {
+        id: SETTINGS_PANEL_ID,
+        title: "Triplejack Helper Settings",
+        label: "T",
+      },
+      {
+        id: SESSION_HISTORY_PANEL_ID,
+        title: "Session History",
+        label: "BB",
+      },
+    ];
+  }
+
+  function buildToolbarButton(toolbar, insertTarget, item) {
     const referenceButton =
       toolbar.querySelector('button[data-testid="panel button"]:not([data-is-active="true"])') || insertTarget;
     const outerClassName = referenceButton.firstElementChild?.className || "";
@@ -1144,7 +1206,7 @@
     const activeButton = toolbar.querySelector('button[data-testid="panel button"][data-is-active="true"]');
 
     helperButton.type = "button";
-    helperButton.title = "Translate Settings";
+    helperButton.title = item.title;
     helperButton.className = referenceButton.className;
     helperButton.style.background = "transparent";
     helperButton.style.paddingLeft = "5px";
@@ -1152,13 +1214,13 @@
     helperButton.dataset.tjHelperInactiveClass = referenceButton.className;
     helperButton.dataset.tjHelperActiveClass =
       activeButton?.className || insertTarget.className || referenceButton.className;
-    helperButton.dataset.tjHelperToolbarButton = "1";
+    helperButton.dataset.tjHelperToolbarButton = item.id;
     helperButton.setAttribute("data-testid", "panel button");
-    helperButton.setAttribute("aria-label", "Translate Settings");
+    helperButton.setAttribute("aria-label", item.title);
     helperButton.innerHTML = `
       <div class="${escapeAttribute(outerClassName)}">
         <div data-testid="icon-scale-wrapper" class="${escapeAttribute(iconWrapperClassName)}">
-          <span style="font:700 23px/1 Arial,sans-serif;color:currentColor;">T</span>
+          <span style="font:700 ${item.label.length > 1 ? "16px" : "23px"}/1 Arial,sans-serif;color:currentColor;letter-spacing:0;">${escapeAttribute(item.label)}</span>
         </div>
       </div>
     `;
@@ -1166,7 +1228,7 @@
     helperButton.addEventListener("click", (event) => {
       event.preventDefault();
       event.stopPropagation();
-      toggleStatusPanel();
+      toggleHelperPanel(item.id);
     });
 
     return helperButton;
@@ -1266,7 +1328,7 @@
   }
 
   function isTimestampMessageElement(element) {
-    if (!element || statusPanel?.contains(element)) {
+    if (!element || getActiveHelperPanelElement()?.contains(element)) {
       return false;
     }
 
@@ -1549,8 +1611,21 @@
   }
 
   // Session history panel
-  function openSessionHistoryPanel() {
-    sessionHistoryPanel?.remove();
+  function renderSessionHistoryPanel() {
+    if (!document.documentElement) {
+      return;
+    }
+
+    if (!isHelperPanelActive(SESSION_HISTORY_PANEL_ID)) {
+      sessionHistoryPanel?.remove();
+      sessionHistoryPanel = null;
+      return;
+    }
+
+    if (sessionHistoryPanel) {
+      renderSessionHistoryPanelBody();
+      return;
+    }
 
     sessionHistoryPanel = document.createElement("div");
     sessionHistoryPanel.style.cssText = [
@@ -1601,7 +1676,7 @@
 
     const closeButton = sessionHistoryPanel.querySelector("[data-tj-session-history-close]");
     const roomSelect = sessionHistoryPanel.querySelector("[data-tj-session-history-room]");
-    closeButton.addEventListener("click", closeSessionHistoryPanel);
+    closeButton.addEventListener("click", closeHelperPanels);
 
     roomSelect.appendChild(new Option("All room types", ""));
     for (const roomType of getSessionHistoryRoomTypes()) {
@@ -1614,11 +1689,6 @@
 
     (document.body || document.documentElement).appendChild(sessionHistoryPanel);
     renderSessionHistoryPanelBody();
-  }
-
-  function closeSessionHistoryPanel() {
-    sessionHistoryPanel?.remove();
-    sessionHistoryPanel = null;
   }
 
   function renderSessionHistoryPanelBody() {
@@ -2062,7 +2132,7 @@
     const summary = buildSessionSummary();
     if (summary) {
       persistSessionSummary(summary);
-      renderStatusPanel();
+      renderHelperPanels();
     }
     resetSessionTracker();
 
@@ -2384,9 +2454,9 @@
       return;
     }
 
-    if (!state.panelVisible) {
+    if (!isHelperPanelActive(SETTINGS_PANEL_ID)) {
       statusPanel?.remove();
-      renderToolbarButtons();
+      statusPanel = null;
       return;
     }
 
@@ -2444,8 +2514,6 @@
               <span>Summary on leave</span>
               <input data-tj-helper-session-summary-enabled type="checkbox" style="margin:0;" />
             </label>
-            <div data-tj-helper-session-tracking-stats style="margin-top:8px;color:#D6EEF5;"></div>
-            <button type="button" data-tj-helper-session-history-open style="margin-top:8px;width:100%;border:1px solid #74A7B9;background:#294655;color:#fff;border-radius:4px;padding:5px;cursor:pointer;">Detailed history</button>
           </section>
           <div style="border-top:1px solid rgba(191,231,241,.22);padding-top:8px;">
             <div style="margin-bottom:6px;color:#E9F7FA;font-weight:700;">Status</div>
@@ -2463,7 +2531,6 @@
       const customOutgoingLanguageInput = statusPanel.querySelector("[data-tj-helper-custom-outgoing-language]");
       const messageTimestampsInput = statusPanel.querySelector("[data-tj-helper-message-timestamps-enabled]");
       const sessionSummaryInput = statusPanel.querySelector("[data-tj-helper-session-summary-enabled]");
-      const sessionHistoryOpenButton = statusPanel.querySelector("[data-tj-helper-session-history-open]");
 
       for (const [value, label] of LANGUAGE_OPTIONS) {
         const option = document.createElement("option");
@@ -2478,8 +2545,7 @@
       }
 
       closeButton.addEventListener("click", () => {
-        state.panelVisible = false;
-        renderStatusPanel();
+        closeHelperPanels();
       });
 
       languageSelect.addEventListener("change", () => {
@@ -2509,8 +2575,6 @@
       sessionSummaryInput.addEventListener("change", () => {
         setSessionSummaryEnabled(sessionSummaryInput.checked);
       });
-
-      sessionHistoryOpenButton.addEventListener("click", openSessionHistoryPanel);
     }
 
     const targetLanguage = getTargetLanguage();
@@ -2522,7 +2586,6 @@
     const customOutgoingLanguageInput = statusPanel.querySelector("[data-tj-helper-custom-outgoing-language]");
     const messageTimestampsInput = statusPanel.querySelector("[data-tj-helper-message-timestamps-enabled]");
     const sessionSummaryInput = statusPanel.querySelector("[data-tj-helper-session-summary-enabled]");
-    const sessionTrackingStatsElement = statusPanel.querySelector("[data-tj-helper-session-tracking-stats]");
     const statsElement = statusPanel.querySelector("[data-tj-helper-stats]");
     const statusElement = statusPanel.querySelector("[data-tj-helper-status]");
 
@@ -2539,7 +2602,6 @@
     customOutgoingLanguageInput.value = outgoingTargetLanguage;
     messageTimestampsInput.checked = getMessageTimestampsEnabled();
     sessionSummaryInput.checked = getSessionSummaryEnabled();
-    sessionTrackingStatsElement.innerHTML = renderSessionTrackingStats();
     statsElement.textContent = `${state.hooked ? "hooked" : "not hooked"} | sockets ${state.sockets}, messages ${state.chatsSeen}, translations ${state.translationsShown}`;
     statusElement.textContent = state.lastStatus;
 
@@ -2548,100 +2610,12 @@
       parent.appendChild(statusPanel);
     }
 
-    renderToolbarButtons();
-  }
-
-  function renderSessionTrackingStats() {
-    const trackingStats = getSessionTrackingStats();
-    if (!trackingStats.overall.sessions) {
-      return `<div style="color:#8FB8C4;">No tracked sessions yet.</div>`;
-    }
-
-    const roomRows = trackingStats.byRoomType
-      .map((roomStats) => {
-        return `
-          <div style="display:grid;grid-template-columns:minmax(0,1fr) auto;gap:6px;">
-            <span style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${escapePanelAttribute(roomStats.roomType)}">${escapePanelHtml(roomStats.roomType)}</span>
-            <strong style="color:${getSessionStatColor(roomStats.bigBlindDelta)};">${formatSessionStatSigned(roomStats.bigBlindsPerHour)}/h</strong>
-          </div>
-        `;
-      })
-      .join("");
-
-    const recentRows = trackingStats.recentSessions
-      .map((session) => {
-        return `
-          <div style="display:grid;grid-template-columns:76px minmax(0,1fr) auto;gap:6px;align-items:center;">
-            <span style="color:#8FB8C4;">${formatSessionDate(session.endedAt)}</span>
-            <span style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${escapePanelAttribute(session.roomType || "")}">${escapePanelHtml(session.roomType || "Unknown room")}</span>
-            <strong style="color:${getSessionStatColor(session.bigBlindDelta)};">${formatSessionStatSigned(session.bigBlindDelta)} BB</strong>
-          </div>
-        `;
-      })
-      .join("");
-
-    return `
-      <div style="margin-top:8px;border-top:1px solid rgba(191,231,241,.16);padding-top:8px;">
-        <div style="display:grid;grid-template-columns:1fr auto;gap:6px;margin-bottom:6px;">
-          <span style="color:#BFE7F1;">Overall</span>
-          <strong style="color:${getSessionStatColor(trackingStats.overall.bigBlindDelta)};">${formatSessionStatSigned(trackingStats.overall.bigBlindsPerHour)}/h</strong>
-          <span style="color:#8FB8C4;">${trackingStats.overall.sessions} sessions</span>
-          <span style="color:${getSessionStatColor(trackingStats.overall.bigBlindDelta)};">${formatSessionStatSigned(trackingStats.overall.bigBlindDelta)} BB</span>
-        </div>
-        <div style="display:grid;grid-template-columns:1fr auto;gap:6px;margin-bottom:8px;">
-          <span style="color:#BFE7F1;">Recent 5</span>
-          <strong style="color:${getSessionStatColor(trackingStats.recentTrend.bigBlindDelta)};">${formatSessionStatSigned(trackingStats.recentTrend.bigBlindsPerHour)}/h</strong>
-          <span style="color:#8FB8C4;">Previous 5</span>
-          <span style="color:${getSessionStatColor(trackingStats.previousTrend.bigBlindDelta)};">${formatSessionStatSigned(trackingStats.previousTrend.bigBlindsPerHour)}/h</span>
-        </div>
-        <div style="margin-bottom:4px;color:#BFE7F1;">By room type</div>
-        <div style="display:grid;gap:4px;margin-bottom:8px;">${roomRows}</div>
-        <div style="margin-bottom:4px;color:#BFE7F1;">Recent sessions</div>
-        <div style="display:grid;gap:4px;">${recentRows}</div>
-      </div>
-    `;
-  }
-
-  function formatSessionStatSigned(value) {
-    if (value === null || value === undefined || !Number.isFinite(value)) {
-      return "n/a";
-    }
-
-    return `${value >= 0 ? "+" : ""}${value.toFixed(1)}`;
-  }
-
-  function getSessionStatColor(value) {
-    if (value === null || value === undefined || !Number.isFinite(value)) {
-      return "#8FB8C4";
-    }
-
-    return value >= 0 ? "#A7D8AD" : "#FFB0A8";
-  }
-
-  function formatSessionDate(timestamp) {
-    return new Date(timestamp).toLocaleDateString([], { month: "numeric", day: "numeric" }) +
-      " " +
-      new Date(timestamp).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
-  }
-
-  function escapePanelHtml(value) {
-    return String(value)
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;")
-      .replace(/"/g, "&quot;")
-      .replace(/'/g, "&#039;");
-  }
-
-  function escapePanelAttribute(value) {
-    return escapePanelHtml(value);
   }
 
   // Startup
   function main() {
     GM_registerMenuCommand("Show Triplejack Helper status", () => {
-      state.panelVisible = true;
-      renderStatusPanel();
+      openHelperPanel(SETTINGS_PANEL_ID);
       alert(`${SCRIPT_NAME}\n${state.lastStatus}`);
     });
     GM_registerMenuCommand("Set Triplejack target language", promptForTargetLanguage);
@@ -2651,10 +2625,9 @@
     installToolbarButton();
     installMessageTimestamps();
     installSessionTracker();
-    installTranslationBridge();
-    injectWebSocketHook();
+    installTranslationFeature();
     setStatus("loaded");
-    renderStatusPanel();
+    renderHelperPanels();
   }
 
   main();

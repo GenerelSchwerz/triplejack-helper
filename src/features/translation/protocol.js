@@ -1,4 +1,4 @@
-  function pageMessageProtocolModule() {
+  function translationProtocolModule() {
     const TRANSLATED_MARKER = "data-tj-translated";
     const requestedPrivateMessageIds = new Set();
 

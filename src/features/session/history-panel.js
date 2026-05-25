@@ -1,5 +1,18 @@
-  function openSessionHistoryPanel() {
-    sessionHistoryPanel?.remove();
+  function renderSessionHistoryPanel() {
+    if (!document.documentElement) {
+      return;
+    }
+
+    if (!isHelperPanelActive(SESSION_HISTORY_PANEL_ID)) {
+      sessionHistoryPanel?.remove();
+      sessionHistoryPanel = null;
+      return;
+    }
+
+    if (sessionHistoryPanel) {
+      renderSessionHistoryPanelBody();
+      return;
+    }
 
     sessionHistoryPanel = document.createElement("div");
     sessionHistoryPanel.style.cssText = [
@@ -50,7 +63,7 @@
 
     const closeButton = sessionHistoryPanel.querySelector("[data-tj-session-history-close]");
     const roomSelect = sessionHistoryPanel.querySelector("[data-tj-session-history-room]");
-    closeButton.addEventListener("click", closeSessionHistoryPanel);
+    closeButton.addEventListener("click", closeHelperPanels);
 
     roomSelect.appendChild(new Option("All room types", ""));
     for (const roomType of getSessionHistoryRoomTypes()) {
@@ -63,11 +76,6 @@
 
     (document.body || document.documentElement).appendChild(sessionHistoryPanel);
     renderSessionHistoryPanelBody();
-  }
-
-  function closeSessionHistoryPanel() {
-    sessionHistoryPanel?.remove();
-    sessionHistoryPanel = null;
   }
 
   function renderSessionHistoryPanelBody() {

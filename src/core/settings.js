@@ -86,8 +86,7 @@
   }
 
   function toggleStatusPanel() {
-    state.panelVisible = !state.panelVisible;
-    renderStatusPanel();
+    toggleHelperPanel(SETTINGS_PANEL_ID);
   }
 
   function installKeyboardShortcuts() {
@@ -123,15 +122,8 @@
         sessionSummaryPanel = null;
       }
 
-      if (sessionHistoryPanel && !sessionHistoryPanel.contains(target) && !target?.closest?.("[data-tj-helper-session-history-open]")) {
-        closeSessionHistoryPanel();
-      }
-
-      if (sessionHistoryPanel?.contains(target)) {
-        return;
-      }
-
-      if (!state.panelVisible || !statusPanel || statusPanel.contains(target)) {
+      const activePanel = getActiveHelperPanelElement();
+      if (activePanel?.contains(target)) {
         return;
       }
 
@@ -139,7 +131,10 @@
         return;
       }
 
-      state.panelVisible = false;
-      renderStatusPanel();
+      if (!state.activePanelId || !activePanel) {
+        return;
+      }
+
+      closeHelperPanels();
     });
   }

@@ -36,7 +36,7 @@
     chatsSeen: 0,
     translationsShown: 0,
     lastStatus: "starting",
-    panelVisible: false,
+    activePanelId: "",
   };
   let statusPanel;
   let sessionSummaryPanel;

@@ -83,7 +83,7 @@
   }
 
   function isTimestampMessageElement(element) {
-    if (!element || statusPanel?.contains(element)) {
+    if (!element || getActiveHelperPanelElement()?.contains(element)) {
       return false;
     }
 

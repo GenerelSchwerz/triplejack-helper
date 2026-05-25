@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Triplejack Helper
 // @namespace    https://triplejack.com/
-// @version      0.3.2
+// @version      0.3.3
 // @description  Translates Triplejack public chat and direct messages using Google Translate requests.
 // @author       Rocco A.
 // @license      MIT
@@ -1033,7 +1033,7 @@
     customLanguageInput.value = targetLanguage;
     outgoingEnabledInput.checked = getOutgoingTranslationEnabled();
     customOutgoingLanguageInput.value = outgoingTargetLanguage;
-    statsElement.textContent = `${state.hooked ? "hooked" : "not hooked"} | sockets ${state.sockets}, chats ${state.chatsSeen}, translations ${state.translationsShown}`;
+    statsElement.textContent = `${state.hooked ? "hooked" : "not hooked"} | sockets ${state.sockets}, messages ${state.chatsSeen}, translations ${state.translationsShown}`;
     statusElement.textContent = state.lastStatus;
 
     const parent = document.body || document.documentElement;

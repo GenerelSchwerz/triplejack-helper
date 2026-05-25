@@ -93,16 +93,30 @@
 
   function injectWebSocketHook() {
     const script = document.createElement("script");
-    script.textContent = `(${pageWebSocketHook.toString()})(${JSON.stringify({
-      scriptName: SCRIPT_NAME,
+    script.textContent = `(() => {
+      const messageProtocol = (${pageMessageProtocolModule.toString()})();
+      const translationRenderer = (${pageTranslationRendererModule.toString()})(messageProtocol.translatedMarker);
+      const createTranslationController = (state, setStatus) => {
+        return (${pageTranslationControllerModule.toString()})(
+          ${JSON.stringify({
       requestEvent: REQUEST_EVENT,
       responseEvent: RESPONSE_EVENT,
       outgoingRequestEvent: OUTGOING_REQUEST_EVENT,
       outgoingResponseEvent: OUTGOING_RESPONSE_EVENT,
       outgoingEnabledStorageKey: OUTGOING_ENABLED_STORAGE_KEY,
+    })},
+          messageProtocol,
+          translationRenderer,
+          state,
+          setStatus,
+        );
+      };
+      (${pageWebSocketHook.toString()})(${JSON.stringify({
+      scriptName: SCRIPT_NAME,
       packetInterceptEvent: PACKET_INTERCEPT_EVENT,
       statusEvent: STATUS_EVENT,
-    })});`;
+    })}, createTranslationController);
+    })();`;
 
     (document.head || document.documentElement).appendChild(script);
     script.remove();

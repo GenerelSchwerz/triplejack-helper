@@ -7,8 +7,11 @@ const outputPath = path.join(rootDir, "triplejack.user.js");
 
 const sections = [
   ["Configuration", "config.js"],
-  ["Userscript bridge", "bridge.js"],
+  ["Page message protocol", "page-message-protocol.js"],
+  ["Page translation renderer", "page-translation-renderer.js"],
+  ["Page translation controller", "page-translation-controller.js"],
   ["Page WebSocket hook", "page-hook.js"],
+  ["Userscript bridge", "bridge.js"],
   ["Translation service", "translate.js"],
   ["Settings", "settings.js"],
   ["Toolbar", "toolbar.js"],

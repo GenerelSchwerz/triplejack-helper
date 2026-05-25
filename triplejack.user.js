@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Triplejack Helper
 // @namespace    https://triplejack.com/
-// @version      0.8.27
+// @version      0.8.28
 // @description  Adds Triplejack chat translation, message tools, and session tracking helpers.
 // @author       Rocco A.
 // @license      MIT
@@ -82,7 +82,8 @@
     lastStatus: "starting",
     activePanelId: "",
     quickBombLastItem: "",
-    quickBombHasTemplate: false,
+    quickBombSelectedItem: "",
+    quickBombItems: [],
     quickBombAmmoCost: 1,
     quickBombInRoom: false,
     quickBombPlayers: [],
@@ -598,11 +599,13 @@
   // Quick bomb controller
   function quickBombControllerModule(config) {
     const state = {
-      lastPacket: "",
       lastItemKey: "",
+      selectedItemKey: "",
+      lastBombCountOrFlag: "1",
       nativeSend: null,
       socketId: "",
       ammoCostByItemKey: new Map(),
+      itemDefinitionByKey: new Map(),
       playerNameById: new Map(),
       inRoom: false,
       selfPlayerId: "",
@@ -630,7 +633,7 @@
 
       if (detail.direction === "incoming") {
         updateAmmoCosts(detail.data);
-        saveIncomingBombTemplate(detail.data);
+        updateIncomingBombTemplate(detail.data);
         return;
       }
 
@@ -638,27 +641,24 @@
         return;
       }
 
+      if (typeof detail.nativeSend === "function") {
+        state.nativeSend = detail.nativeSend;
+        state.socketId = detail.socketId || state.socketId;
+      }
+
       const itemKey = getBombItemKey(detail.data);
       if (!itemKey || typeof detail.nativeSend !== "function") {
         return;
       }
 
-      if (!detail.data.startsWith("newbomb:")) {
-        state.lastItemKey = itemKey;
-        state.nativeSend = detail.nativeSend;
-        state.socketId = detail.socketId || "";
-        setStatus(`quick bomb threw ${itemKey}; waiting for newbomb template`);
-        return;
-      }
-
-      state.lastPacket = detail.data;
       state.lastItemKey = itemKey;
+      state.lastBombCountOrFlag = getBombCountOrFlag(detail.data) || state.lastBombCountOrFlag;
       state.nativeSend = detail.nativeSend;
       state.socketId = detail.socketId || "";
       setStatus(`quick bomb saved ${itemKey}`);
     }
 
-    function saveIncomingBombTemplate(data) {
+    function updateIncomingBombTemplate(data) {
       if (!data.startsWith("newbomb:")) {
         return;
       }
@@ -668,9 +668,8 @@
         return;
       }
 
-      state.lastPacket = data;
       state.lastItemKey = itemKey;
-      setStatus(`quick bomb saved ${itemKey} template`);
+      setStatus(`quick bomb saw ${itemKey} animation`);
     }
 
     function handleKeyDown(event) {
@@ -703,6 +702,11 @@
 
       if (action === "selectTarget") {
         selectTarget(event.detail);
+        return;
+      }
+
+      if (action === "selectItem") {
+        selectItem(event.detail);
       }
     }
 
@@ -721,12 +725,8 @@
         return;
       }
 
-      if (!state.lastPacket || typeof state.nativeSend !== "function") {
-        setStatus(
-          state.lastPacket
-            ? "quick bomb needs an outgoing bomb send first"
-            : `quick bomb needs incoming newbomb template for ${state.lastItemKey}`,
-        );
+      if (!getSelectedItemKey() || typeof state.nativeSend !== "function") {
+        setStatus("quick bomb needs an item and websocket sender");
         return;
       }
 
@@ -735,11 +735,16 @@
         return;
       }
 
+      if (!state.selectedTarget.playerName) {
+        setStatus("quick bomb target needs player name");
+        return;
+      }
+
       stopTimer();
       state.active = true;
       state.runSent = 0;
       state.targetSends = getTargetSends();
-      setStatus(`quick bomb started ${state.lastItemKey} x${state.targetSends}`);
+      setStatus(`quick bomb started ${getSelectedItemKey()} x${state.targetSends}`);
       if (getSpeedMode() === "instant") {
         sendInstantBombs();
         return;
@@ -769,13 +774,18 @@
         return;
       }
 
-      if (!state.lastPacket || typeof state.nativeSend !== "function") {
+      if (!getSelectedItemKey() || typeof state.nativeSend !== "function") {
         stopSpam("quick bomb lost socket");
         return;
       }
 
       if (!state.inRoom || !state.selectedTarget) {
         stopSpam("quick bomb needs a room target");
+        return;
+      }
+
+      if (!state.selectedTarget.playerName) {
+        stopSpam("quick bomb target needs player name");
         return;
       }
 
@@ -788,7 +798,7 @@
       state.runSent += 1;
       state.replayCount += 1;
       state.lastReplayAt = Date.now();
-      setStatus(`quick bomb threw ${state.lastItemKey}`);
+      setStatus(`quick bomb threw ${getSelectedItemKey()}`);
 
       if (state.runSent >= state.targetSends) {
         stopSpam(`quick bomb finished ${state.runSent}`);
@@ -822,7 +832,7 @@
     }
 
     function getAmmoTargetSends() {
-      return Math.floor(getAmmo() / getAmmoCost(state.lastItemKey));
+      return Math.floor(getAmmo() / getAmmoCost(getSelectedItemKey()));
     }
 
     function getAmmoCost(itemKey) {
@@ -830,17 +840,7 @@
     }
 
     function buildTargetedBombPacket() {
-      if (!state.lastPacket.startsWith("newbomb:")) {
-        return state.lastPacket;
-      }
-
-      const fields = splitProtocolFields(state.lastPacket.slice("newbomb:".length));
-      if (fields.length < 3) {
-        return state.lastPacket;
-      }
-
-      fields[2] = String(state.selectedTarget.seat);
-      return `newbomb:${fields.join(",")}`;
+      return `bomb:${getSelectedItemKey()},${encodeBombTargetName(state.selectedTarget.playerName)},${state.lastBombCountOrFlag || "1"}`;
     }
 
     function updateAmmoCosts(data) {
@@ -849,11 +849,13 @@
 
       if (data.startsWith("inventory_defs:")) {
         updateAmmoCostsFromInventoryDefs(data.slice("inventory_defs:".length));
+        setStatus(`quick bomb items loaded ${state.itemDefinitionByKey.size}`);
         return;
       }
 
       if (data.startsWith("bombs_init:")) {
         updateAmmoCostsFromBombsInit(data.slice("bombs_init:".length));
+        setStatus(`quick bomb items loaded ${state.itemDefinitionByKey.size}`);
       }
     }
 
@@ -1038,6 +1040,17 @@
       setStatus(`quick bomb target ${target.playerName}`);
     }
 
+    function selectItem(detail) {
+      const itemKey = normalizeItemKey(detail?.itemKey);
+      if (!itemKey || !state.itemDefinitionByKey.has(itemKey)) {
+        setStatus("quick bomb item unavailable");
+        return;
+      }
+
+      state.selectedItemKey = itemKey;
+      setStatus(`quick bomb item ${getItemLabel(itemKey)}`);
+    }
+
     function updateAmmoCostsFromInventoryDefs(payload) {
       const groups = splitProtocolFields(stripOuterBraces(payload));
       for (const group of groups) {
@@ -1048,6 +1061,7 @@
 
         for (const itemDefinition of splitProtocolFields(stripOuterBraces(groupFields[1] || ""))) {
           const itemFields = splitProtocolFields(stripOuterBraces(itemDefinition));
+          setItemDefinition(itemFields[0], "", itemFields[1]);
           setAmmoCost(itemFields[0], itemFields[1]);
         }
       }
@@ -1056,8 +1070,24 @@
     function updateAmmoCostsFromBombsInit(payload) {
       for (const itemDefinition of splitProtocolFields(stripOuterBraces(payload))) {
         const itemFields = splitProtocolFields(stripOuterBraces(itemDefinition));
+        setItemDefinition(itemFields[0], itemFields[1], itemFields[5]);
         setAmmoCost(itemFields[0], itemFields[5]);
       }
+    }
+
+    function setItemDefinition(itemKey, label, cost) {
+      const normalizedItemKey = normalizeItemKey(itemKey);
+      if (!normalizedItemKey) {
+        return;
+      }
+
+      const numericCost = Number(cost);
+      const existingDefinition = state.itemDefinitionByKey.get(normalizedItemKey) || {};
+      state.itemDefinitionByKey.set(normalizedItemKey, {
+        itemKey: normalizedItemKey,
+        label: decodeProtocolText(label || existingDefinition.label || normalizedItemKey),
+        cost: Number.isFinite(numericCost) && numericCost > 0 ? Math.max(1, Math.round(numericCost)) : existingDefinition.cost || 1,
+      });
     }
 
     function setAmmoCost(itemKey, cost) {
@@ -1072,6 +1102,20 @@
 
     function normalizeItemKey(itemKey) {
       return String(itemKey || "").trim().toLowerCase();
+    }
+
+    function getSelectedItemKey() {
+      return state.selectedItemKey || state.lastItemKey;
+    }
+
+    function getItemLabel(itemKey) {
+      return state.itemDefinitionByKey.get(normalizeItemKey(itemKey))?.label || itemKey;
+    }
+
+    function getItemDefinitions() {
+      return Array.from(state.itemDefinitionByKey.values()).sort((a, b) => {
+        return a.label.localeCompare(b.label);
+      });
     }
 
     function stripOuterBraces(value) {
@@ -1144,6 +1188,19 @@
       return match?.[1] || "";
     }
 
+    function getBombCountOrFlag(data) {
+      if (!data.startsWith("bomb:")) {
+        return "";
+      }
+
+      const fields = splitProtocolFields(data.slice("bomb:".length));
+      return fields[2] || "";
+    }
+
+    function encodeBombTargetName(playerName) {
+      return String(playerName || "").replace(/,/g, "");
+    }
+
     function isQuickBombHotkey(event) {
       return (
         event.ctrlKey &&
@@ -1201,11 +1258,12 @@
         new CustomEvent(config.statusEvent, {
           detail: {
             quickBombLastItem: state.lastItemKey,
-            quickBombHasTemplate: Boolean(state.lastPacket),
+            quickBombSelectedItem: getSelectedItemKey(),
+            quickBombItems: getItemDefinitions(),
             quickBombReplayCount: state.replayCount,
             quickBombSocketId: state.socketId,
             quickBombLastReplayAt: state.lastReplayAt,
-            quickBombAmmoCost: getAmmoCost(state.lastItemKey),
+            quickBombAmmoCost: getAmmoCost(getSelectedItemKey()),
             quickBombInRoom: state.inRoom,
             quickBombPlayers: state.players,
             quickBombSelectedPlayerId: state.selectedTarget?.playerId || "",
@@ -5098,6 +5156,10 @@
             <div data-tj-helper-quick-bomb-status style="margin-top:6px;color:#8FB8C4;font-size:11px;"></div>
           </section>
           <section style="border:1px solid rgba(191,231,241,.2);border-radius:6px;padding:10px;background:rgba(255,255,255,.025);">
+            <div style="margin-bottom:8px;color:#E9F7FA;font-weight:700;">Items</div>
+            <div data-tj-helper-quick-bomb-items style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;"></div>
+          </section>
+          <section style="border:1px solid rgba(191,231,241,.2);border-radius:6px;padding:10px;background:rgba(255,255,255,.025);">
             <div style="margin-bottom:8px;color:#E9F7FA;font-weight:700;">Targets</div>
             <div data-tj-helper-quick-bomb-targets style="display:grid;gap:6px;"></div>
           </section>
@@ -5140,6 +5202,16 @@
           seat: targetButton.dataset.tjHelperSeat,
         });
       });
+      quickBombPanel.querySelector("[data-tj-helper-quick-bomb-items]").addEventListener("click", (event) => {
+        const itemButton = event.target.closest("[data-tj-helper-quick-bomb-item]");
+        if (!itemButton) {
+          return;
+        }
+
+        sendQuickBombControl("selectItem", {
+          itemKey: itemButton.dataset.tjHelperItemKey,
+        });
+      });
     }
 
     refreshQuickBombPanel();
@@ -5161,6 +5233,7 @@
     const startButton = quickBombPanel.querySelector("[data-tj-helper-quick-bomb-start]");
     const stopButton = quickBombPanel.querySelector("[data-tj-helper-quick-bomb-stop]");
     const statusElement = quickBombPanel.querySelector("[data-tj-helper-quick-bomb-status]");
+    const itemsElement = quickBombPanel.querySelector("[data-tj-helper-quick-bomb-items]");
     const targetsElement = quickBombPanel.querySelector("[data-tj-helper-quick-bomb-targets]");
 
     enabledInput.checked = getQuickBombEnabled();
@@ -5174,19 +5247,50 @@
     ammoInput.style.display = getQuickBombMode() === "ammo" ? "" : "none";
     ammoLabel.style.display = getQuickBombMode() === "ammo" ? "" : "none";
 
-    const hasTarget = Boolean(state.quickBombSelectedPlayerId);
-    const canStart = state.quickBombInRoom && hasTarget && getQuickBombEnabled() && !state.quickBombActive;
+    const players = Array.isArray(state.quickBombPlayers) ? state.quickBombPlayers : [];
+    const selectedTarget = players.find((player) => player.playerId === state.quickBombSelectedPlayerId);
+    const hasTarget = Boolean(selectedTarget?.playerName);
+    const hasItem = Boolean(state.quickBombSelectedItem || state.quickBombLastItem);
+    const canStart = state.quickBombInRoom && hasTarget && hasItem && getQuickBombEnabled() && !state.quickBombActive;
     startButton.disabled = !canStart;
     stopButton.disabled = !state.quickBombActive;
     startButton.style.opacity = startButton.disabled ? ".5" : "1";
     stopButton.style.opacity = stopButton.disabled ? ".5" : "1";
-    statusElement.textContent = state.quickBombLastItem
-      ? `Last thrown: ${state.quickBombLastItem} | template ${state.quickBombHasTemplate ? "ready" : "waiting"} | cost ${state.quickBombAmmoCost || 1} | sent ${state.quickBombReplayCount || 0}${
+    const activeItem = state.quickBombSelectedItem || state.quickBombLastItem;
+    statusElement.textContent = activeItem
+      ? `Selected: ${activeItem} | last thrown: ${state.quickBombLastItem || "none"} | cost ${state.quickBombAmmoCost || 1} | sent ${state.quickBombReplayCount || 0}${
           state.quickBombActive ? ` | remaining ${state.quickBombRemaining || 0}` : ""
         }`
-      : "No bomb saved yet.";
+      : "Select an item or throw one bomb.";
 
+    renderQuickBombItems(itemsElement);
     renderQuickBombTargets(targetsElement);
+  }
+
+  function renderQuickBombItems(itemsElement) {
+    const items = Array.isArray(state.quickBombItems) ? state.quickBombItems : [];
+    const selectedItem = state.quickBombSelectedItem || state.quickBombLastItem;
+    if (!items.length) {
+      itemsElement.innerHTML = `<div style="grid-column:1/-1;color:#8FB8C4;">Waiting for item definitions.</div>`;
+      return;
+    }
+
+    itemsElement.innerHTML = items
+      .map((item) => {
+        const selected = item.itemKey === selectedItem;
+        return `
+          <button
+            type="button"
+            data-tj-helper-quick-bomb-item="1"
+            data-tj-helper-item-key="${escapeQuickBombHtml(item.itemKey)}"
+            style="min-width:0;text-align:left;border:1px solid ${selected ? "rgba(126,214,196,.95)" : "rgba(191,231,241,.2)"};border-radius:6px;background:${selected ? "rgba(126,214,196,.16)" : "rgba(255,255,255,.035)"};color:#F5FAFC;padding:7px;cursor:pointer;"
+          >
+            <span style="display:block;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeQuickBombHtml(item.label || item.itemKey)}</span>
+            <span style="display:block;color:#8FB8C4;font-size:11px;margin-top:2px;">${escapeQuickBombHtml(item.itemKey)} | ${escapeQuickBombHtml(item.cost || 1)}</span>
+          </button>
+        `;
+      })
+      .join("");
   }
 
   function renderQuickBombTargets(targetsElement) {

@@ -60,6 +60,10 @@
             <div data-tj-helper-quick-bomb-status style="margin-top:6px;color:#8FB8C4;font-size:11px;"></div>
           </section>
           <section style="border:1px solid rgba(191,231,241,.2);border-radius:6px;padding:10px;background:rgba(255,255,255,.025);">
+            <div style="margin-bottom:8px;color:#E9F7FA;font-weight:700;">Items</div>
+            <div data-tj-helper-quick-bomb-items style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;"></div>
+          </section>
+          <section style="border:1px solid rgba(191,231,241,.2);border-radius:6px;padding:10px;background:rgba(255,255,255,.025);">
             <div style="margin-bottom:8px;color:#E9F7FA;font-weight:700;">Targets</div>
             <div data-tj-helper-quick-bomb-targets style="display:grid;gap:6px;"></div>
           </section>
@@ -102,6 +106,16 @@
           seat: targetButton.dataset.tjHelperSeat,
         });
       });
+      quickBombPanel.querySelector("[data-tj-helper-quick-bomb-items]").addEventListener("click", (event) => {
+        const itemButton = event.target.closest("[data-tj-helper-quick-bomb-item]");
+        if (!itemButton) {
+          return;
+        }
+
+        sendQuickBombControl("selectItem", {
+          itemKey: itemButton.dataset.tjHelperItemKey,
+        });
+      });
     }
 
     refreshQuickBombPanel();
@@ -123,6 +137,7 @@
     const startButton = quickBombPanel.querySelector("[data-tj-helper-quick-bomb-start]");
     const stopButton = quickBombPanel.querySelector("[data-tj-helper-quick-bomb-stop]");
     const statusElement = quickBombPanel.querySelector("[data-tj-helper-quick-bomb-status]");
+    const itemsElement = quickBombPanel.querySelector("[data-tj-helper-quick-bomb-items]");
     const targetsElement = quickBombPanel.querySelector("[data-tj-helper-quick-bomb-targets]");
 
     enabledInput.checked = getQuickBombEnabled();
@@ -136,19 +151,50 @@
     ammoInput.style.display = getQuickBombMode() === "ammo" ? "" : "none";
     ammoLabel.style.display = getQuickBombMode() === "ammo" ? "" : "none";
 
-    const hasTarget = Boolean(state.quickBombSelectedPlayerId);
-    const canStart = state.quickBombInRoom && hasTarget && getQuickBombEnabled() && !state.quickBombActive;
+    const players = Array.isArray(state.quickBombPlayers) ? state.quickBombPlayers : [];
+    const selectedTarget = players.find((player) => player.playerId === state.quickBombSelectedPlayerId);
+    const hasTarget = Boolean(selectedTarget?.playerName);
+    const hasItem = Boolean(state.quickBombSelectedItem || state.quickBombLastItem);
+    const canStart = state.quickBombInRoom && hasTarget && hasItem && getQuickBombEnabled() && !state.quickBombActive;
     startButton.disabled = !canStart;
     stopButton.disabled = !state.quickBombActive;
     startButton.style.opacity = startButton.disabled ? ".5" : "1";
     stopButton.style.opacity = stopButton.disabled ? ".5" : "1";
-    statusElement.textContent = state.quickBombLastItem
-      ? `Last thrown: ${state.quickBombLastItem} | template ${state.quickBombHasTemplate ? "ready" : "waiting"} | cost ${state.quickBombAmmoCost || 1} | sent ${state.quickBombReplayCount || 0}${
+    const activeItem = state.quickBombSelectedItem || state.quickBombLastItem;
+    statusElement.textContent = activeItem
+      ? `Selected: ${activeItem} | last thrown: ${state.quickBombLastItem || "none"} | cost ${state.quickBombAmmoCost || 1} | sent ${state.quickBombReplayCount || 0}${
           state.quickBombActive ? ` | remaining ${state.quickBombRemaining || 0}` : ""
         }`
-      : "No bomb saved yet.";
+      : "Select an item or throw one bomb.";
 
+    renderQuickBombItems(itemsElement);
     renderQuickBombTargets(targetsElement);
+  }
+
+  function renderQuickBombItems(itemsElement) {
+    const items = Array.isArray(state.quickBombItems) ? state.quickBombItems : [];
+    const selectedItem = state.quickBombSelectedItem || state.quickBombLastItem;
+    if (!items.length) {
+      itemsElement.innerHTML = `<div style="grid-column:1/-1;color:#8FB8C4;">Waiting for item definitions.</div>`;
+      return;
+    }
+
+    itemsElement.innerHTML = items
+      .map((item) => {
+        const selected = item.itemKey === selectedItem;
+        return `
+          <button
+            type="button"
+            data-tj-helper-quick-bomb-item="1"
+            data-tj-helper-item-key="${escapeQuickBombHtml(item.itemKey)}"
+            style="min-width:0;text-align:left;border:1px solid ${selected ? "rgba(126,214,196,.95)" : "rgba(191,231,241,.2)"};border-radius:6px;background:${selected ? "rgba(126,214,196,.16)" : "rgba(255,255,255,.035)"};color:#F5FAFC;padding:7px;cursor:pointer;"
+          >
+            <span style="display:block;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeQuickBombHtml(item.label || item.itemKey)}</span>
+            <span style="display:block;color:#8FB8C4;font-size:11px;margin-top:2px;">${escapeQuickBombHtml(item.itemKey)} | ${escapeQuickBombHtml(item.cost || 1)}</span>
+          </button>
+        `;
+      })
+      .join("");
   }
 
   function renderQuickBombTargets(targetsElement) {

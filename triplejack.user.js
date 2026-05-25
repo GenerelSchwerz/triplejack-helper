@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Triplejack Helper
 // @namespace    https://triplejack.com/
-// @version      0.6.25
+// @version      0.6.26
 // @description  Adds Triplejack chat translation, message tools, and session tracking helpers.
 // @author       Rocco A.
 // @license      MIT
@@ -1072,6 +1072,7 @@
       "width:100%",
       "height:100%",
       "min-width:0",
+      "min-height:0",
       "display:flex",
       "align-items:stretch",
       "flex:1 1 auto",
@@ -1088,6 +1089,7 @@
       "width:100%",
       "height:100%",
       "min-width:0",
+      "min-height:0",
       "flex:1 1 auto",
       "box-sizing:border-box",
       "overflow:hidden",
@@ -1190,8 +1192,10 @@
     panelRegion.style.cssText = [
       "height:100%",
       "min-width:0",
+      "min-height:0",
       "display:flex",
       "align-items:stretch",
+      "align-self:stretch",
       `flex:0 1 ${panelWidth}px`,
       `max-width:min(${panelWidth}px,calc(100vw - 64px))`,
     ].join(";");
@@ -1202,6 +1206,7 @@
     panelContainer.style.cssText = [
       "height:100%",
       "min-width:0",
+      "min-height:0",
       "display:flex",
       "align-items:stretch",
     ].join(";");
@@ -1224,6 +1229,7 @@
       "left:-14px",
       "top:0",
       "bottom:0",
+      "height:100%",
       "width:24px",
       "z-index:20",
       "cursor:col-resize",
@@ -1325,6 +1331,9 @@
     element.style.setProperty("width", `${panelWidth}px`, "important");
     element.style.setProperty("min-width", `${panelWidth}px`, "important");
     element.style.setProperty("max-width", `min(${panelWidth}px,calc(100vw - 64px))`, "important");
+    element.style.setProperty("height", "100%", "important");
+    element.style.setProperty("min-height", "0", "important");
+    element.style.setProperty("align-self", "stretch", "important");
   }
 
   function getResolvedHelperPanelWidth() {
@@ -1336,23 +1345,29 @@
       return;
     }
 
-    for (const property of ["flex", "flex-basis", "width", "min-width", "max-width"]) {
+    for (const property of ["flex", "flex-basis", "width", "min-width", "max-width", "height", "min-height", "align-self"]) {
       element.style.removeProperty(property);
     }
   }
 
   function refreshNativeLayoutAfterPanelWidthChange() {
     applyHelperPanelWidth();
+    resizeNativeStageToContainer();
     scheduleLayoutRefresh();
     window.requestAnimationFrame(() => {
+      resizeNativeStageToContainer();
       scheduleLayoutRefresh();
     });
-    window.setTimeout(scheduleLayoutRefresh, 120);
+    window.setTimeout(() => {
+      resizeNativeStageToContainer();
+      scheduleLayoutRefresh();
+    }, 120);
   }
 
   function scheduleNativePanelWidthApply() {
     const refresh = () => {
       applyHelperPanelWidth();
+      resizeNativeStageToContainer();
       scheduleLayoutRefresh();
     };
 
@@ -1496,9 +1511,33 @@
   function scheduleLayoutRefresh() {
     window.dispatchEvent(new Event("resize"));
     window.requestAnimationFrame(() => {
+      resizeNativeStageToContainer();
       window.dispatchEvent(new Event("resize"));
       sessionHistoryChart?.resize?.();
     });
+  }
+
+  function resizeNativeStageToContainer() {
+    const stageContainer = document.querySelector('[data-testid="poker-stage-container"]');
+    const canvas = stageContainer?.querySelector?.("canvas");
+    if (!stageContainer || !canvas) {
+      return;
+    }
+
+    const width = Math.round(stageContainer.clientWidth || stageContainer.getBoundingClientRect().width || 0);
+    const height = Math.round(stageContainer.clientHeight || stageContainer.getBoundingClientRect().height || 0);
+    if (width <= 0 || height <= 0) {
+      return;
+    }
+
+    canvas.style.width = `${width}px`;
+    canvas.style.height = `${height}px`;
+    if (canvas.width !== width) {
+      canvas.width = width;
+    }
+    if (canvas.height !== height) {
+      canvas.height = height;
+    }
   }
 
   function getActiveHelperPanelElement() {

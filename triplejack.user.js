@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Triplejack Helper
 // @namespace    https://triplejack.com/
-// @version      0.8.3
+// @version      0.8.4
 // @description  Adds Triplejack chat translation, message tools, and session tracking helpers.
 // @author       Rocco A.
 // @license      MIT
@@ -939,6 +939,7 @@
   let pendingHelperPanelOpenId = 0;
   let helperShellNativeButton = null;
   let helperPanelSizingStyle = null;
+  let helperPanelSizingReconcileQueued = false;
 
   function isHelperPanelActive(panelId) {
     return state.activePanelId === panelId;
@@ -1473,6 +1474,32 @@
     clearNativeStageWidthStyle();
   }
 
+  function queueHelperPanelSizingReconcile() {
+    if (helperPanelSizingReconcileQueued) {
+      return;
+    }
+
+    helperPanelSizingReconcileQueued = true;
+    window.requestAnimationFrame(() => {
+      helperPanelSizingReconcileQueued = false;
+      reconcileHelperPanelSizingState();
+    });
+  }
+
+  function reconcileHelperPanelSizingState() {
+    if (hasOpenPanel()) {
+      syncHelperPanelResizeHandle();
+      return;
+    }
+
+    clearHelperPanelLayoutOverrides();
+    removeEmptyHelperPanelRegion();
+    deactivateHelperPanelSizingIfClosed();
+    syncHelperPanelResizeHandle();
+    resizeNativeStageToContainer();
+    window.dispatchEvent(new Event("resize"));
+  }
+
   function prepareHelperPanelWidthBeforeOpen() {
     const panelWidth = getResolvedHelperPanelWidth();
     activateHelperPanelSizing(panelWidth);
@@ -1504,35 +1531,37 @@
   }
 
   function setNativeStageWidthStyle(panelWidth) {
-    const stageContainer = document.querySelector('[data-testid="poker-stage-container"]');
-    const sceneRow = stageContainer?.parentElement;
-    if (!stageContainer?.style || !sceneRow?.style) {
-      return;
-    }
+    for (const stageContainer of document.querySelectorAll('[data-testid="poker-stage-container"]')) {
+      const sceneRow = stageContainer.parentElement;
+      if (!stageContainer?.style || !sceneRow?.style) {
+        continue;
+      }
 
-    sceneRow.style.setProperty("min-width", "0", "important");
-    sceneRow.style.setProperty("overflow", "hidden", "important");
-    stageContainer.style.setProperty("flex", "1 1 0", "important");
-    stageContainer.style.setProperty("flex-basis", "0", "important");
-    stageContainer.style.setProperty("width", `calc(100% - ${panelWidth}px)`, "important");
-    stageContainer.style.setProperty("min-width", "0", "important");
-    stageContainer.style.setProperty("max-width", `calc(100% - ${panelWidth}px)`, "important");
-    stageContainer.style.setProperty("overflow", "hidden", "important");
+      sceneRow.style.setProperty("min-width", "0", "important");
+      sceneRow.style.setProperty("overflow", "hidden", "important");
+      stageContainer.style.setProperty("flex", "1 1 0", "important");
+      stageContainer.style.setProperty("flex-basis", "0", "important");
+      stageContainer.style.setProperty("width", `calc(100% - ${panelWidth}px)`, "important");
+      stageContainer.style.setProperty("min-width", "0", "important");
+      stageContainer.style.setProperty("max-width", `calc(100% - ${panelWidth}px)`, "important");
+      stageContainer.style.setProperty("overflow", "hidden", "important");
+    }
   }
 
   function clearNativeStageWidthStyle() {
-    const stageContainer = document.querySelector('[data-testid="poker-stage-container"]');
-    const sceneRow = stageContainer?.parentElement;
-    if (sceneRow?.style) {
-      sceneRow.style.removeProperty("overflow");
-      sceneRow.style.removeProperty("min-width");
-    }
-    if (!stageContainer?.style) {
-      return;
-    }
+    for (const stageContainer of document.querySelectorAll('[data-testid="poker-stage-container"]')) {
+      const sceneRow = stageContainer.parentElement;
+      if (sceneRow?.style) {
+        sceneRow.style.removeProperty("overflow");
+        sceneRow.style.removeProperty("min-width");
+      }
+      if (!stageContainer?.style) {
+        continue;
+      }
 
-    for (const property of ["flex", "flex-basis", "width", "min-width", "max-width", "overflow"]) {
-      stageContainer.style.removeProperty(property);
+      for (const property of ["flex", "flex-basis", "width", "min-width", "max-width", "overflow"]) {
+        stageContainer.style.removeProperty(property);
+      }
     }
   }
 
@@ -1784,40 +1813,43 @@
   }
 
   function resizeNativeStageToContainer() {
-    const stageContainer = document.querySelector('[data-testid="poker-stage-container"]');
-    const canvas = stageContainer?.querySelector?.("canvas");
-    if (!stageContainer || !canvas) {
-      return;
-    }
+    for (const stageContainer of document.querySelectorAll('[data-testid="poker-stage-container"]')) {
+      const canvas = stageContainer?.querySelector?.("canvas");
+      if (!stageContainer || !canvas) {
+        continue;
+      }
 
-    const panelContainer = document.querySelector('[data-testid="panel-container"]');
-    const sceneRow = stageContainer.parentElement;
-    const panelWidth = Math.round(panelContainer?.parentElement?.getBoundingClientRect?.().width || 0);
-    const rowWidth = Math.round(sceneRow?.clientWidth || sceneRow?.getBoundingClientRect?.().width || 0);
-    const width = Math.round(
-      (rowWidth && panelWidth ? rowWidth - panelWidth : 0) ||
-        stageContainer.clientWidth ||
-        stageContainer.getBoundingClientRect().width ||
-        0,
-    );
-    const height = Math.round(stageContainer.clientHeight || stageContainer.getBoundingClientRect().height || 0);
-    if (width <= 0 || height <= 0) {
-      return;
-    }
+      const sceneRow = stageContainer.parentElement;
+      const panelRegion = hasOpenPanel()
+        ? [...(sceneRow?.children || [])].find((child) => child.querySelector?.('[data-testid="panel-container"]'))
+        : null;
+      const panelWidth = Math.round(panelRegion?.getBoundingClientRect?.().width || 0);
+      const rowWidth = Math.round(sceneRow?.clientWidth || sceneRow?.getBoundingClientRect?.().width || 0);
+      const width = Math.round(
+        (rowWidth && panelWidth ? rowWidth - panelWidth : 0) ||
+          stageContainer.clientWidth ||
+          stageContainer.getBoundingClientRect().width ||
+          0,
+      );
+      const height = Math.round(stageContainer.clientHeight || stageContainer.getBoundingClientRect().height || 0);
+      if (width <= 0 || height <= 0) {
+        continue;
+      }
 
-    canvas.style.width = `${width}px`;
-    canvas.style.height = `${height}px`;
-    if (canvas.width !== width) {
-      canvas.width = width;
-    }
-    if (canvas.height !== height) {
-      canvas.height = height;
-    }
+      canvas.style.width = `${width}px`;
+      canvas.style.height = `${height}px`;
+      if (canvas.width !== width) {
+        canvas.width = width;
+      }
+      if (canvas.height !== height) {
+        canvas.height = height;
+      }
 
-    const statusOverlay = document.querySelector('section[aria-label="table status"]')?.parentElement;
-    if (statusOverlay?.style) {
-      statusOverlay.style.width = `${width}px`;
-      statusOverlay.style.height = `${height}px`;
+      const statusOverlay = document.querySelector('section[aria-label="table status"]')?.parentElement;
+      if (statusOverlay?.style) {
+        statusOverlay.style.width = `${width}px`;
+        statusOverlay.style.height = `${height}px`;
+      }
     }
   }
 
@@ -1996,6 +2028,7 @@
 
     const observer = new MutationObserver(() => {
       renderToolbarButtons();
+      queueHelperPanelSizingReconcile();
     });
 
     observer.observe(document.documentElement, {
@@ -2012,7 +2045,10 @@
     window.addEventListener("load", renderToolbarButtons, { once: true });
 
     for (const delay of [0, 250, 1000, 2500]) {
-      window.setTimeout(renderToolbarButtons, delay);
+      window.setTimeout(() => {
+        renderToolbarButtons();
+        queueHelperPanelSizingReconcile();
+      }, delay);
     }
   }
 

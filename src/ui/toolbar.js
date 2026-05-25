@@ -5,6 +5,7 @@
 
     const observer = new MutationObserver(() => {
       renderToolbarButtons();
+      queueHelperPanelSizingReconcile();
     });
 
     observer.observe(document.documentElement, {
@@ -21,7 +22,10 @@
     window.addEventListener("load", renderToolbarButtons, { once: true });
 
     for (const delay of [0, 250, 1000, 2500]) {
-      window.setTimeout(renderToolbarButtons, delay);
+      window.setTimeout(() => {
+        renderToolbarButtons();
+        queueHelperPanelSizingReconcile();
+      }, delay);
     }
   }
 

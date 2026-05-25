@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Triplejack Helper
 // @namespace    https://triplejack.com/
-// @version      0.8.13
+// @version      0.8.14
 // @description  Adds Triplejack chat translation, message tools, and session tracking helpers.
 // @author       Rocco A.
 // @license      MIT
@@ -33,10 +33,12 @@
   const MESSAGE_TIMESTAMPS_STORAGE_KEY = "triplejack-helper-message-timestamps-enabled";
   const SESSION_SUMMARY_STORAGE_KEY = "triplejack-helper-session-summary-enabled";
   const SESSION_HISTORY_STORAGE_KEY = "triplejack-helper-session-history";
+  const QUICK_BOMB_ENABLED_STORAGE_KEY = "triplejack-helper-quick-bomb-enabled";
   const HELPER_PANEL_WIDTH_STORAGE_KEY = "triplejack-helper-panel-width";
   const HELPER_PANEL_WIDTH_ENABLED_STORAGE_KEY = "triplejack-helper-panel-width-enabled";
   const PANEL_TOGGLE_KEY = "L";
   const LANGUAGE_PROMPT_KEY = "Y";
+  const QUICK_BOMB_KEY = "B";
   const LANGUAGE_OPTIONS = [
     ["en", "English"],
     ["es", "Spanish"],
@@ -70,6 +72,8 @@
     translationsShown: 0,
     lastStatus: "starting",
     activePanelId: "",
+    quickBombLastItem: "",
+    quickBombReplayCount: 0,
   };
   let statusPanel;
   let sessionSummaryPanel;
@@ -574,6 +578,106 @@
     };
   }
 
+  // Quick bomb controller
+  function quickBombControllerModule(config) {
+    const state = {
+      lastPacket: "",
+      lastItemKey: "",
+      nativeSend: null,
+      socketId: "",
+      replayCount: 0,
+      lastReplayAt: 0,
+    };
+
+    function install() {
+      document.addEventListener(config.socketMessageEvent, handleSocketMessage);
+      document.addEventListener("keydown", handleKeyDown, true);
+    }
+
+    function handleSocketMessage(event) {
+      const detail = event.detail;
+      if (detail?.direction !== "outgoing" || typeof detail.data !== "string") {
+        return;
+      }
+
+      const itemKey = getBombItemKey(detail.data);
+      if (!itemKey || typeof detail.nativeSend !== "function") {
+        return;
+      }
+
+      state.lastPacket = detail.data;
+      state.lastItemKey = itemKey;
+      state.nativeSend = detail.nativeSend;
+      state.socketId = detail.socketId || "";
+      setStatus(`quick bomb saved ${itemKey}`);
+    }
+
+    function handleKeyDown(event) {
+      if (!isQuickBombHotkey(event)) {
+        return;
+      }
+
+      event.preventDefault();
+      event.stopPropagation();
+      event.stopImmediatePropagation?.();
+      replayLastBomb();
+    }
+
+    function replayLastBomb() {
+      if (!isQuickBombEnabled()) {
+        setStatus("quick bomb disabled");
+        return;
+      }
+
+      if (!state.lastPacket || typeof state.nativeSend !== "function") {
+        setStatus("quick bomb has no saved bomb");
+        return;
+      }
+
+      state.nativeSend(state.lastPacket);
+      state.replayCount += 1;
+      state.lastReplayAt = Date.now();
+      setStatus(`quick bomb threw ${state.lastItemKey}`);
+    }
+
+    function getBombItemKey(data) {
+      const match = String(data).match(/^(?:bomb|newbomb):([^,]+)/);
+      return match?.[1] || "";
+    }
+
+    function isQuickBombHotkey(event) {
+      return (
+        event.ctrlKey &&
+        event.shiftKey &&
+        !event.altKey &&
+        !event.metaKey &&
+        event.key.toUpperCase() === config.hotkey
+      );
+    }
+
+    function isQuickBombEnabled() {
+      return window.localStorage?.getItem(config.enabledStorageKey) !== "0";
+    }
+
+    function setStatus(status) {
+      document.dispatchEvent(
+        new CustomEvent(config.statusEvent, {
+          detail: {
+            quickBombLastItem: state.lastItemKey,
+            quickBombReplayCount: state.replayCount,
+            quickBombSocketId: state.socketId,
+            quickBombLastReplayAt: state.lastReplayAt,
+            lastStatus: status,
+          },
+        }),
+      );
+    }
+
+    return {
+      install,
+    };
+  }
+
   // Page WebSocket hook
   function pageWebSocketHook(config) {
     const NativeWebSocket = window.WebSocket;
@@ -918,7 +1022,14 @@
         messageProtocol,
         translationRenderer,
       );
+      const quickBombController = (${quickBombControllerModule.toString()})(${JSON.stringify({
+      socketMessageEvent: SOCKET_MESSAGE_EVENT,
+      statusEvent: STATUS_EVENT,
+      enabledStorageKey: QUICK_BOMB_ENABLED_STORAGE_KEY,
+      hotkey: QUICK_BOMB_KEY,
+    })});
       translationController.install();
+      quickBombController.install();
       (${pageWebSocketHook.toString()})(${JSON.stringify({
       scriptName: SCRIPT_NAME,
       packetInterceptEvent: PACKET_INTERCEPT_EVENT,
@@ -1921,6 +2032,10 @@
     return localStorage.getItem(SESSION_SUMMARY_STORAGE_KEY) !== "0";
   }
 
+  function getQuickBombEnabled() {
+    return localStorage.getItem(QUICK_BOMB_ENABLED_STORAGE_KEY) !== "0";
+  }
+
   function getHelperPanelWidth() {
     return clampHelperPanelWidth(localStorage.getItem(HELPER_PANEL_WIDTH_STORAGE_KEY) || HELPER_PANEL_WIDTH);
   }
@@ -1974,6 +2089,12 @@
   function setSessionSummaryEnabled(enabled) {
     localStorage.setItem(SESSION_SUMMARY_STORAGE_KEY, enabled ? "1" : "0");
     setStatus(`session summary ${enabled ? "enabled" : "disabled"}`);
+    renderStatusPanel();
+  }
+
+  function setQuickBombEnabled(enabled) {
+    localStorage.setItem(QUICK_BOMB_ENABLED_STORAGE_KEY, enabled ? "1" : "0");
+    setStatus(`quick bomb ${enabled ? "enabled" : "disabled"}`);
     renderStatusPanel();
   }
 
@@ -4306,6 +4427,14 @@
             </label>
           </section>
           <section style="border:1px solid rgba(191,231,241,.2);border-radius:6px;padding:10px;background:rgba(255,255,255,.025);">
+            <div style="margin-bottom:8px;color:#E9F7FA;font-weight:700;">Quick Bomb</div>
+            <label style="display:flex;align-items:center;justify-content:space-between;gap:12px;color:#BFE7F1;">
+              <span>Replay last bomb</span>
+              <input data-tj-helper-quick-bomb-enabled type="checkbox" style="margin:0;" />
+            </label>
+            <div data-tj-helper-quick-bomb-status style="margin-top:6px;color:#8FB8C4;font-size:11px;"></div>
+          </section>
+          <section style="border:1px solid rgba(191,231,241,.2);border-radius:6px;padding:10px;background:rgba(255,255,255,.025);">
             <div style="margin-bottom:8px;color:#E9F7FA;font-weight:700;">Session Tracking</div>
             <label style="display:flex;align-items:center;justify-content:space-between;gap:12px;color:#BFE7F1;">
               <span>Summary on leave</span>
@@ -4342,6 +4471,7 @@
       const outgoingLanguageSelect = statusPanel.querySelector("[data-tj-helper-outgoing-language]");
       const customOutgoingLanguageInput = statusPanel.querySelector("[data-tj-helper-custom-outgoing-language]");
       const messageTimestampsInput = statusPanel.querySelector("[data-tj-helper-message-timestamps-enabled]");
+      const quickBombInput = statusPanel.querySelector("[data-tj-helper-quick-bomb-enabled]");
       const sessionSummaryInput = statusPanel.querySelector("[data-tj-helper-session-summary-enabled]");
       const panelWidthEnabledInput = statusPanel.querySelector("[data-tj-helper-panel-width-enabled]");
       const panelWidthInput = statusPanel.querySelector("[data-tj-helper-panel-width]");
@@ -4383,6 +4513,10 @@
         setMessageTimestampsEnabled(messageTimestampsInput.checked);
       });
 
+      quickBombInput.addEventListener("change", () => {
+        setQuickBombEnabled(quickBombInput.checked);
+      });
+
       sessionSummaryInput.addEventListener("change", () => {
         setSessionSummaryEnabled(sessionSummaryInput.checked);
       });
@@ -4412,6 +4546,8 @@
     const outgoingLanguageSelect = statusPanel.querySelector("[data-tj-helper-outgoing-language]");
     const customOutgoingLanguageInput = statusPanel.querySelector("[data-tj-helper-custom-outgoing-language]");
     const messageTimestampsInput = statusPanel.querySelector("[data-tj-helper-message-timestamps-enabled]");
+    const quickBombInput = statusPanel.querySelector("[data-tj-helper-quick-bomb-enabled]");
+    const quickBombStatusElement = statusPanel.querySelector("[data-tj-helper-quick-bomb-status]");
     const sessionSummaryInput = statusPanel.querySelector("[data-tj-helper-session-summary-enabled]");
     const panelWidthEnabledInput = statusPanel.querySelector("[data-tj-helper-panel-width-enabled]");
     const panelWidthInput = statusPanel.querySelector("[data-tj-helper-panel-width]");
@@ -4431,6 +4567,10 @@
     outgoingEnabledInput.checked = getOutgoingTranslationEnabled();
     customOutgoingLanguageInput.value = outgoingTargetLanguage;
     messageTimestampsInput.checked = getMessageTimestampsEnabled();
+    quickBombInput.checked = getQuickBombEnabled();
+    quickBombStatusElement.textContent = state.quickBombLastItem
+      ? `Saved: ${state.quickBombLastItem} | replays ${state.quickBombReplayCount || 0}`
+      : "No bomb saved yet.";
     sessionSummaryInput.checked = getSessionSummaryEnabled();
     panelWidthEnabledInput.checked = getHelperPanelWidthEnabled();
     panelWidthInput.value = String(getHelperPanelWidth());

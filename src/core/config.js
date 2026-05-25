@@ -6,10 +6,12 @@
   const MESSAGE_TIMESTAMPS_STORAGE_KEY = "triplejack-helper-message-timestamps-enabled";
   const SESSION_SUMMARY_STORAGE_KEY = "triplejack-helper-session-summary-enabled";
   const SESSION_HISTORY_STORAGE_KEY = "triplejack-helper-session-history";
+  const QUICK_BOMB_ENABLED_STORAGE_KEY = "triplejack-helper-quick-bomb-enabled";
   const HELPER_PANEL_WIDTH_STORAGE_KEY = "triplejack-helper-panel-width";
   const HELPER_PANEL_WIDTH_ENABLED_STORAGE_KEY = "triplejack-helper-panel-width-enabled";
   const PANEL_TOGGLE_KEY = "L";
   const LANGUAGE_PROMPT_KEY = "Y";
+  const QUICK_BOMB_KEY = "B";
   const LANGUAGE_OPTIONS = [
     ["en", "English"],
     ["es", "Spanish"],
@@ -43,6 +45,8 @@
     translationsShown: 0,
     lastStatus: "starting",
     activePanelId: "",
+    quickBombLastItem: "",
+    quickBombReplayCount: 0,
   };
   let statusPanel;
   let sessionSummaryPanel;

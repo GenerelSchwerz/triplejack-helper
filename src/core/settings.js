@@ -18,6 +18,10 @@
     return localStorage.getItem(SESSION_SUMMARY_STORAGE_KEY) !== "0";
   }
 
+  function getQuickBombEnabled() {
+    return localStorage.getItem(QUICK_BOMB_ENABLED_STORAGE_KEY) !== "0";
+  }
+
   function getHelperPanelWidth() {
     return clampHelperPanelWidth(localStorage.getItem(HELPER_PANEL_WIDTH_STORAGE_KEY) || HELPER_PANEL_WIDTH);
   }
@@ -71,6 +75,12 @@
   function setSessionSummaryEnabled(enabled) {
     localStorage.setItem(SESSION_SUMMARY_STORAGE_KEY, enabled ? "1" : "0");
     setStatus(`session summary ${enabled ? "enabled" : "disabled"}`);
+    renderStatusPanel();
+  }
+
+  function setQuickBombEnabled(enabled) {
+    localStorage.setItem(QUICK_BOMB_ENABLED_STORAGE_KEY, enabled ? "1" : "0");
+    setStatus(`quick bomb ${enabled ? "enabled" : "disabled"}`);
     renderStatusPanel();
   }
 

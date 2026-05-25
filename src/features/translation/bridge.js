@@ -114,7 +114,14 @@
         messageProtocol,
         translationRenderer,
       );
+      const quickBombController = (${quickBombControllerModule.toString()})(${JSON.stringify({
+      socketMessageEvent: SOCKET_MESSAGE_EVENT,
+      statusEvent: STATUS_EVENT,
+      enabledStorageKey: QUICK_BOMB_ENABLED_STORAGE_KEY,
+      hotkey: QUICK_BOMB_KEY,
+    })});
       translationController.install();
+      quickBombController.install();
       (${pageWebSocketHook.toString()})(${JSON.stringify({
       scriptName: SCRIPT_NAME,
       packetInterceptEvent: PACKET_INTERCEPT_EVENT,

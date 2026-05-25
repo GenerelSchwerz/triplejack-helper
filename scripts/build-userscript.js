@@ -10,6 +10,7 @@ const sections = [
   ["Translation protocol", "features/translation/protocol.js"],
   ["Translation renderer", "features/translation/renderer.js"],
   ["Translation controller", "features/translation/controller.js"],
+  ["Quick bomb controller", "features/bombs/quick-bomb.js"],
   ["Page WebSocket hook", "page/hook.js"],
   ["Translation service", "features/translation/service.js"],
   ["Translation bridge", "features/translation/bridge.js"],

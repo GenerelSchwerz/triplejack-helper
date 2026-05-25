@@ -13,6 +13,7 @@ Open the raw `triplejack.user.js` file from this repository in your browser and 
 - Optional translation for sent public chat and direct messages.
 - Configurable incoming and outgoing target languages.
 - Optional message timestamps.
+- Quick bomb replay: tracks the last bomb packet you throw and replays it with `Ctrl+Shift+B`.
 - Optional table session summary when leaving a room.
 - Persistent session history with date, room type, and period filters.
 - Session history charting with selectable BB/hour, net BB, and cumulative BB line views over the selected time range.

@@ -55,6 +55,14 @@
             </label>
           </section>
           <section style="border:1px solid rgba(191,231,241,.2);border-radius:6px;padding:10px;background:rgba(255,255,255,.025);">
+            <div style="margin-bottom:8px;color:#E9F7FA;font-weight:700;">Quick Bomb</div>
+            <label style="display:flex;align-items:center;justify-content:space-between;gap:12px;color:#BFE7F1;">
+              <span>Replay last bomb</span>
+              <input data-tj-helper-quick-bomb-enabled type="checkbox" style="margin:0;" />
+            </label>
+            <div data-tj-helper-quick-bomb-status style="margin-top:6px;color:#8FB8C4;font-size:11px;"></div>
+          </section>
+          <section style="border:1px solid rgba(191,231,241,.2);border-radius:6px;padding:10px;background:rgba(255,255,255,.025);">
             <div style="margin-bottom:8px;color:#E9F7FA;font-weight:700;">Session Tracking</div>
             <label style="display:flex;align-items:center;justify-content:space-between;gap:12px;color:#BFE7F1;">
               <span>Summary on leave</span>
@@ -91,6 +99,7 @@
       const outgoingLanguageSelect = statusPanel.querySelector("[data-tj-helper-outgoing-language]");
       const customOutgoingLanguageInput = statusPanel.querySelector("[data-tj-helper-custom-outgoing-language]");
       const messageTimestampsInput = statusPanel.querySelector("[data-tj-helper-message-timestamps-enabled]");
+      const quickBombInput = statusPanel.querySelector("[data-tj-helper-quick-bomb-enabled]");
       const sessionSummaryInput = statusPanel.querySelector("[data-tj-helper-session-summary-enabled]");
       const panelWidthEnabledInput = statusPanel.querySelector("[data-tj-helper-panel-width-enabled]");
       const panelWidthInput = statusPanel.querySelector("[data-tj-helper-panel-width]");
@@ -132,6 +141,10 @@
         setMessageTimestampsEnabled(messageTimestampsInput.checked);
       });
 
+      quickBombInput.addEventListener("change", () => {
+        setQuickBombEnabled(quickBombInput.checked);
+      });
+
       sessionSummaryInput.addEventListener("change", () => {
         setSessionSummaryEnabled(sessionSummaryInput.checked);
       });
@@ -161,6 +174,8 @@
     const outgoingLanguageSelect = statusPanel.querySelector("[data-tj-helper-outgoing-language]");
     const customOutgoingLanguageInput = statusPanel.querySelector("[data-tj-helper-custom-outgoing-language]");
     const messageTimestampsInput = statusPanel.querySelector("[data-tj-helper-message-timestamps-enabled]");
+    const quickBombInput = statusPanel.querySelector("[data-tj-helper-quick-bomb-enabled]");
+    const quickBombStatusElement = statusPanel.querySelector("[data-tj-helper-quick-bomb-status]");
     const sessionSummaryInput = statusPanel.querySelector("[data-tj-helper-session-summary-enabled]");
     const panelWidthEnabledInput = statusPanel.querySelector("[data-tj-helper-panel-width-enabled]");
     const panelWidthInput = statusPanel.querySelector("[data-tj-helper-panel-width]");
@@ -180,6 +195,10 @@
     outgoingEnabledInput.checked = getOutgoingTranslationEnabled();
     customOutgoingLanguageInput.value = outgoingTargetLanguage;
     messageTimestampsInput.checked = getMessageTimestampsEnabled();
+    quickBombInput.checked = getQuickBombEnabled();
+    quickBombStatusElement.textContent = state.quickBombLastItem
+      ? `Saved: ${state.quickBombLastItem} | replays ${state.quickBombReplayCount || 0}`
+      : "No bomb saved yet.";
     sessionSummaryInput.checked = getSessionSummaryEnabled();
     panelWidthEnabledInput.checked = getHelperPanelWidthEnabled();
     panelWidthInput.value = String(getHelperPanelWidth());

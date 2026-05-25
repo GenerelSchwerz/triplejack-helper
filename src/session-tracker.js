@@ -14,7 +14,7 @@
   };
 
   function installSessionTracker() {
-    document.addEventListener(PACKET_INTERCEPT_EVENT, handleSessionPacket);
+    document.addEventListener(SOCKET_MESSAGE_EVENT, handleSessionPacket);
   }
 
   function handleSessionPacket(event) {

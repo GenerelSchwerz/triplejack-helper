@@ -1,17 +1,40 @@
-  function pageTranslationControllerModule(config, messageProtocol, translationRenderer, state, setStatus) {
+  function pageTranslationControllerModule(config, messageProtocol, translationRenderer) {
     const pendingRequests = new Map();
     const pendingOutgoingRequests = new Map();
+    const state = {
+      chatsSeen: 0,
+      translationsShown: 0,
+      lastStatus: "starting",
+    };
 
     function install() {
+      document.addEventListener(config.socketMessageEvent, handleSocketMessage);
       document.addEventListener(config.responseEvent, handleTranslationResponse);
       document.addEventListener(config.outgoingResponseEvent, handleOutgoingTranslationResponse);
     }
 
-    function handleIncomingMessage(data, socket, socketId) {
-      if (typeof data !== "string") {
+    function setStatus(status) {
+      state.lastStatus = status;
+      document.dispatchEvent(new CustomEvent(config.statusEvent, { detail: { ...state } }));
+    }
+
+    function handleSocketMessage(event) {
+      const detail = event.detail;
+      if (!detail || typeof detail.data !== "string") {
         return;
       }
 
+      if (detail.direction === "incoming") {
+        handleIncomingMessage(detail.data, detail.socket, detail.socketId);
+        return;
+      }
+
+      if (detail.direction === "outgoing" && handleOutgoingMessage(detail.data, detail.nativeSend, detail.socketId)) {
+        event.preventDefault();
+      }
+    }
+
+    function handleIncomingMessage(data, socket, socketId) {
       const chatMessages = messageProtocol.parseTranslatableMessages(data, (error) => {
         setStatus(`private message parse failed: ${error.message}`);
       });
@@ -38,7 +61,7 @@
     }
 
     function handleOutgoingMessage(data, nativeSend, socketId) {
-      if (!isOutgoingTranslationEnabled()) {
+      if (!isOutgoingTranslationEnabled() || typeof nativeSend !== "function") {
         return false;
       }
 
@@ -151,7 +174,5 @@
 
     return {
       install,
-      handleIncomingMessage,
-      handleOutgoingMessage,
     };
   }

@@ -96,26 +96,26 @@
     script.textContent = `(() => {
       const messageProtocol = (${pageMessageProtocolModule.toString()})();
       const translationRenderer = (${pageTranslationRendererModule.toString()})(messageProtocol.translatedMarker);
-      const createTranslationController = (state, setStatus) => {
-        return (${pageTranslationControllerModule.toString()})(
-          ${JSON.stringify({
+      const translationController = (${pageTranslationControllerModule.toString()})(
+        ${JSON.stringify({
       requestEvent: REQUEST_EVENT,
       responseEvent: RESPONSE_EVENT,
       outgoingRequestEvent: OUTGOING_REQUEST_EVENT,
       outgoingResponseEvent: OUTGOING_RESPONSE_EVENT,
       outgoingEnabledStorageKey: OUTGOING_ENABLED_STORAGE_KEY,
+      socketMessageEvent: SOCKET_MESSAGE_EVENT,
+      statusEvent: STATUS_EVENT,
     })},
-          messageProtocol,
-          translationRenderer,
-          state,
-          setStatus,
-        );
-      };
+        messageProtocol,
+        translationRenderer,
+      );
+      translationController.install();
       (${pageWebSocketHook.toString()})(${JSON.stringify({
       scriptName: SCRIPT_NAME,
       packetInterceptEvent: PACKET_INTERCEPT_EVENT,
+      socketMessageEvent: SOCKET_MESSAGE_EVENT,
       statusEvent: STATUS_EVENT,
-    })}, createTranslationController);
+    })});
     })();`;
 
     (document.head || document.documentElement).appendChild(script);

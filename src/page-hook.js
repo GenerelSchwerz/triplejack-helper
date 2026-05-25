@@ -1,11 +1,9 @@
-﻿  function pageWebSocketHook(config, createTranslationController) {
+  function pageWebSocketHook(config) {
     const NativeWebSocket = window.WebSocket;
     const redispatchedIncomingEvents = new WeakSet();
     const state = {
       hooked: false,
       sockets: 0,
-      chatsSeen: 0,
-      translationsShown: 0,
       lastStatus: "starting",
     };
 
@@ -18,8 +16,6 @@
       log(status);
       document.dispatchEvent(new CustomEvent(config.statusEvent, { detail: { ...state } }));
     }
-
-    const translationController = createTranslationController(state, setStatus);
 
     function install() {
       if (window.__triplejackTranslateWebSocketHookInstalled) {
@@ -59,9 +55,16 @@
               return undefined;
             }
 
-            data = interceptedPacket.data;
+            const socketEvent = dispatchSocketMessageEvent({
+              direction: "outgoing",
+              socketId,
+              url: String(url || ""),
+              data: interceptedPacket.data,
+              socket,
+              nativeSend,
+            });
 
-            return translationController.handleOutgoingMessage(data, nativeSend, socketId) ? undefined : nativeSend(data);
+            return socketEvent.defaultPrevented ? undefined : nativeSend(interceptedPacket.data);
           };
 
           return socket;
@@ -100,11 +103,15 @@
         const replacementEvent = cloneMessageEvent(event, interceptedPacket.data);
         redispatchedIncomingEvents.add(replacementEvent);
         socket.dispatchEvent(replacementEvent);
-        translationController.handleIncomingMessage(interceptedPacket.data, socket, socketId);
-        return;
       }
 
-      translationController.handleIncomingMessage(event.data, socket, socketId);
+      dispatchSocketMessageEvent({
+        direction: "incoming",
+        socketId,
+        url,
+        data: interceptedPacket.data,
+        socket,
+      });
     }
 
     function interceptWebSocketPacket(packet) {
@@ -132,6 +139,18 @@
       };
     }
 
+    function dispatchSocketMessageEvent(detail) {
+      const socketEvent = new CustomEvent(config.socketMessageEvent, {
+        cancelable: detail.direction === "outgoing",
+        detail: {
+          ...detail,
+          command: getPacketCommand(detail.data),
+        },
+      });
+      document.dispatchEvent(socketEvent);
+      return socketEvent;
+    }
+
     function getPacketCommand(data) {
       if (typeof data !== "string") {
         return "";
@@ -155,6 +174,5 @@
       });
     }
 
-    translationController.install();
     install();
   }

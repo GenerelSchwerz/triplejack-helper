@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Triplejack Helper
 // @namespace    https://triplejack.com/
-// @version      0.5.4
+// @version      0.5.5
 // @description  Translates Triplejack public chat and direct messages using Google Translate requests.
 // @author       Rocco A.
 // @license      MIT
@@ -51,6 +51,7 @@
   const OUTGOING_REQUEST_EVENT = "tj-helper-outgoing-translate-request";
   const OUTGOING_RESPONSE_EVENT = "tj-helper-outgoing-translate-response";
   const PACKET_INTERCEPT_EVENT = "tj-helper-websocket-packet";
+  const SOCKET_MESSAGE_EVENT = "tj-helper-websocket-message";
   const STATUS_EVENT = "tj-helper-status";
   const pageWindow = typeof unsafeWindow === "undefined" ? window : unsafeWindow;
   const translationCache = new Map();
@@ -380,20 +381,43 @@
   }
 
   // Page translation controller
-  function pageTranslationControllerModule(config, messageProtocol, translationRenderer, state, setStatus) {
+  function pageTranslationControllerModule(config, messageProtocol, translationRenderer) {
     const pendingRequests = new Map();
     const pendingOutgoingRequests = new Map();
+    const state = {
+      chatsSeen: 0,
+      translationsShown: 0,
+      lastStatus: "starting",
+    };
 
     function install() {
+      document.addEventListener(config.socketMessageEvent, handleSocketMessage);
       document.addEventListener(config.responseEvent, handleTranslationResponse);
       document.addEventListener(config.outgoingResponseEvent, handleOutgoingTranslationResponse);
     }
 
-    function handleIncomingMessage(data, socket, socketId) {
-      if (typeof data !== "string") {
+    function setStatus(status) {
+      state.lastStatus = status;
+      document.dispatchEvent(new CustomEvent(config.statusEvent, { detail: { ...state } }));
+    }
+
+    function handleSocketMessage(event) {
+      const detail = event.detail;
+      if (!detail || typeof detail.data !== "string") {
         return;
       }
 
+      if (detail.direction === "incoming") {
+        handleIncomingMessage(detail.data, detail.socket, detail.socketId);
+        return;
+      }
+
+      if (detail.direction === "outgoing" && handleOutgoingMessage(detail.data, detail.nativeSend, detail.socketId)) {
+        event.preventDefault();
+      }
+    }
+
+    function handleIncomingMessage(data, socket, socketId) {
       const chatMessages = messageProtocol.parseTranslatableMessages(data, (error) => {
         setStatus(`private message parse failed: ${error.message}`);
       });
@@ -420,7 +444,7 @@
     }
 
     function handleOutgoingMessage(data, nativeSend, socketId) {
-      if (!isOutgoingTranslationEnabled()) {
+      if (!isOutgoingTranslationEnabled() || typeof nativeSend !== "function") {
         return false;
       }
 
@@ -533,20 +557,16 @@
 
     return {
       install,
-      handleIncomingMessage,
-      handleOutgoingMessage,
     };
   }
 
   // Page WebSocket hook
-  function pageWebSocketHook(config, createTranslationController) {
+  function pageWebSocketHook(config) {
     const NativeWebSocket = window.WebSocket;
     const redispatchedIncomingEvents = new WeakSet();
     const state = {
       hooked: false,
       sockets: 0,
-      chatsSeen: 0,
-      translationsShown: 0,
       lastStatus: "starting",
     };
 
@@ -559,8 +579,6 @@
       log(status);
       document.dispatchEvent(new CustomEvent(config.statusEvent, { detail: { ...state } }));
     }
-
-    const translationController = createTranslationController(state, setStatus);
 
     function install() {
       if (window.__triplejackTranslateWebSocketHookInstalled) {
@@ -600,9 +618,16 @@
               return undefined;
             }
 
-            data = interceptedPacket.data;
+            const socketEvent = dispatchSocketMessageEvent({
+              direction: "outgoing",
+              socketId,
+              url: String(url || ""),
+              data: interceptedPacket.data,
+              socket,
+              nativeSend,
+            });
 
-            return translationController.handleOutgoingMessage(data, nativeSend, socketId) ? undefined : nativeSend(data);
+            return socketEvent.defaultPrevented ? undefined : nativeSend(interceptedPacket.data);
           };
 
           return socket;
@@ -641,11 +666,15 @@
         const replacementEvent = cloneMessageEvent(event, interceptedPacket.data);
         redispatchedIncomingEvents.add(replacementEvent);
         socket.dispatchEvent(replacementEvent);
-        translationController.handleIncomingMessage(interceptedPacket.data, socket, socketId);
-        return;
       }
 
-      translationController.handleIncomingMessage(event.data, socket, socketId);
+      dispatchSocketMessageEvent({
+        direction: "incoming",
+        socketId,
+        url,
+        data: interceptedPacket.data,
+        socket,
+      });
     }
 
     function interceptWebSocketPacket(packet) {
@@ -673,6 +702,18 @@
       };
     }
 
+    function dispatchSocketMessageEvent(detail) {
+      const socketEvent = new CustomEvent(config.socketMessageEvent, {
+        cancelable: detail.direction === "outgoing",
+        detail: {
+          ...detail,
+          command: getPacketCommand(detail.data),
+        },
+      });
+      document.dispatchEvent(socketEvent);
+      return socketEvent;
+    }
+
     function getPacketCommand(data) {
       if (typeof data !== "string") {
         return "";
@@ -696,7 +737,6 @@
       });
     }
 
-    translationController.install();
     install();
   }
 
@@ -799,26 +839,26 @@
     script.textContent = `(() => {
       const messageProtocol = (${pageMessageProtocolModule.toString()})();
       const translationRenderer = (${pageTranslationRendererModule.toString()})(messageProtocol.translatedMarker);
-      const createTranslationController = (state, setStatus) => {
-        return (${pageTranslationControllerModule.toString()})(
-          ${JSON.stringify({
+      const translationController = (${pageTranslationControllerModule.toString()})(
+        ${JSON.stringify({
       requestEvent: REQUEST_EVENT,
       responseEvent: RESPONSE_EVENT,
       outgoingRequestEvent: OUTGOING_REQUEST_EVENT,
       outgoingResponseEvent: OUTGOING_RESPONSE_EVENT,
       outgoingEnabledStorageKey: OUTGOING_ENABLED_STORAGE_KEY,
+      socketMessageEvent: SOCKET_MESSAGE_EVENT,
+      statusEvent: STATUS_EVENT,
     })},
-          messageProtocol,
-          translationRenderer,
-          state,
-          setStatus,
-        );
-      };
+        messageProtocol,
+        translationRenderer,
+      );
+      translationController.install();
       (${pageWebSocketHook.toString()})(${JSON.stringify({
       scriptName: SCRIPT_NAME,
       packetInterceptEvent: PACKET_INTERCEPT_EVENT,
+      socketMessageEvent: SOCKET_MESSAGE_EVENT,
       statusEvent: STATUS_EVENT,
-    })}, createTranslationController);
+    })});
     })();`;
 
     (document.head || document.documentElement).appendChild(script);
@@ -1289,7 +1329,7 @@
   };
 
   function installSessionTracker() {
-    document.addEventListener(PACKET_INTERCEPT_EVENT, handleSessionPacket);
+    document.addEventListener(SOCKET_MESSAGE_EVENT, handleSessionPacket);
   }
 
   function handleSessionPacket(event) {

@@ -25,6 +25,7 @@
   const OUTGOING_REQUEST_EVENT = "tj-helper-outgoing-translate-request";
   const OUTGOING_RESPONSE_EVENT = "tj-helper-outgoing-translate-response";
   const PACKET_INTERCEPT_EVENT = "tj-helper-websocket-packet";
+  const SOCKET_MESSAGE_EVENT = "tj-helper-websocket-message";
   const STATUS_EVENT = "tj-helper-status";
   const pageWindow = typeof unsafeWindow === "undefined" ? window : unsafeWindow;
   const translationCache = new Map();

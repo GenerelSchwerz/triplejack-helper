@@ -1,9 +1,12 @@
+  let sessionHistoryChart = null;
+
   function renderSessionHistoryPanel() {
     if (!document.documentElement) {
       return;
     }
 
     if (!isHelperPanelActive(SESSION_HISTORY_PANEL_ID)) {
+      destroySessionHistoryChart();
       sessionHistoryPanel?.remove();
       sessionHistoryPanel = null;
       return;
@@ -91,10 +94,12 @@
     const report = getSessionHistoryReport(filters);
 
     if (!report.overall.sessions) {
+      destroySessionHistoryChart();
       body.innerHTML = `<div style="color:#8FB8C4;">No tracked sessions match this date range.</div>`;
       return;
     }
 
+    destroySessionHistoryChart();
     body.innerHTML = `
       <div style="${getHistoryMetricGridStyle()}">
         ${renderHistoryMetric("Sessions", report.overall.sessions)}
@@ -118,6 +123,7 @@
         <div style="display:grid;gap:4px;">${report.sessions.map(renderHistorySessionRow).join("")}</div>
       </section>
     `;
+    renderHistoryTrendChart(report);
   }
 
   function renderHistoryTrendGraph(report) {
@@ -126,13 +132,39 @@
       return "";
     }
 
-    const chartWidth = 360;
-    const chartHeight = 190;
-    const padding = { top: 14, right: 14, bottom: 32, left: 42 };
-    const plotWidth = chartWidth - padding.left - padding.right;
-    const plotHeight = chartHeight - padding.top - padding.bottom;
+    return `
+      <section style="${getHistorySectionStyle()}margin-bottom:12px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px;">
+          <div style="${getHistoryHeadingStyle()}margin-bottom:0;">Selected range graph</div>
+        </div>
+        <div style="position:relative;height:230px;width:100%;min-width:0;">
+          <canvas data-tj-session-history-chart aria-label="Session history graph for selected range" role="img"></canvas>
+          <div data-tj-session-history-chart-fallback style="display:none;color:#8FB8C4;padding:10px;border:1px solid rgba(191,231,241,.16);border-radius:6px;background:rgba(8,17,23,.25);">
+            Chart.js did not load, so the history graph cannot be rendered.
+          </div>
+        </div>
+      </section>
+    `;
+  }
+
+  function renderHistoryTrendChart(report) {
+    const chartElement = sessionHistoryPanel?.querySelector("[data-tj-session-history-chart]");
+    if (!chartElement) {
+      return;
+    }
+
+    const ChartConstructor = getChartConstructor();
+    if (!ChartConstructor) {
+      chartElement.style.display = "none";
+      const fallback = sessionHistoryPanel.querySelector("[data-tj-session-history-chart-fallback]");
+      if (fallback) {
+        fallback.style.display = "block";
+      }
+      return;
+    }
+
     let cumulativeBigBlinds = 0;
-    const chartPoints = periods.map((period) => {
+    const chartPoints = (report.periods || []).map((period) => {
       cumulativeBigBlinds += Number(period.bigBlindDelta) || 0;
       return {
         label: period.periodLabel,
@@ -140,74 +172,97 @@
         cumulativeBigBlinds,
       };
     });
-    const values = chartPoints.flatMap((point) => [point.netBigBlinds, point.cumulativeBigBlinds, 0]);
-    const minValue = Math.min(...values);
-    const maxValue = Math.max(...values);
-    const range = maxValue === minValue ? 1 : maxValue - minValue;
-    const xForIndex = (index) =>
-      chartPoints.length === 1
-        ? padding.left + plotWidth / 2
-        : padding.left + (index / (chartPoints.length - 1)) * plotWidth;
-    const yForValue = (value) => padding.top + ((maxValue - value) / range) * plotHeight;
-    const zeroY = yForValue(0);
-    const barSlotWidth = plotWidth / Math.max(chartPoints.length, 1);
-    const barWidth = Math.max(5, Math.min(22, barSlotWidth * 0.42));
-    const linePoints = chartPoints
-      .map((point, index) => `${xForIndex(index).toFixed(1)},${yForValue(point.cumulativeBigBlinds).toFixed(1)}`)
-      .join(" ");
-    const labelStep = Math.max(1, Math.ceil(chartPoints.length / 5));
-    const yTicks = [maxValue, (maxValue + minValue) / 2, minValue];
 
-    return `
-      <section style="${getHistorySectionStyle()}margin-bottom:12px;">
-        <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px;">
-          <div style="${getHistoryHeadingStyle()}margin-bottom:0;">Selected range graph</div>
-          <div style="display:flex;gap:8px;align-items:center;color:#8FB8C4;font-size:11px;white-space:nowrap;">
-            <span><span style="${getHistoryLegendSwatchStyle("#6EA8FE")}"></span>Net BB</span>
-            <span><span style="${getHistoryLegendSwatchStyle("#F6C85F")}"></span>Cumulative</span>
-          </div>
-        </div>
-        <svg viewBox="0 0 ${chartWidth} ${chartHeight}" role="img" aria-label="Session history graph for selected range" style="display:block;width:100%;height:auto;max-height:230px;overflow:visible;">
-          <rect x="0" y="0" width="${chartWidth}" height="${chartHeight}" rx="6" fill="rgba(8,17,23,.35)"></rect>
-          ${yTicks
-            .map((tick) => {
-              const y = yForValue(tick);
-              return `
-                <line x1="${padding.left}" y1="${y.toFixed(1)}" x2="${chartWidth - padding.right}" y2="${y.toFixed(1)}" stroke="rgba(191,231,241,.12)" stroke-width="1"></line>
-                <text x="${padding.left - 7}" y="${(y + 3).toFixed(1)}" text-anchor="end" fill="#8FB8C4" font-size="9">${escapeHistoryHtml(formatHistoryAxisValue(tick))}</text>
-              `;
-            })
-            .join("")}
-          <line x1="${padding.left}" y1="${zeroY.toFixed(1)}" x2="${chartWidth - padding.right}" y2="${zeroY.toFixed(1)}" stroke="rgba(245,250,252,.32)" stroke-width="1"></line>
-          ${chartPoints
-            .map((point, index) => {
-              const x = xForIndex(index) - barWidth / 2;
-              const y = Math.min(zeroY, yForValue(point.netBigBlinds));
-              const height = Math.max(1, Math.abs(zeroY - yForValue(point.netBigBlinds)));
-              const color = point.netBigBlinds >= 0 ? "#6EA8FE" : "#FF8D7A";
-              return `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${barWidth.toFixed(1)}" height="${height.toFixed(1)}" rx="2" fill="${color}" opacity=".78"><title>${escapeHistoryHtml(point.label)}: ${formatHistorySigned(point.netBigBlinds)} BB</title></rect>`;
-            })
-            .join("")}
-          <polyline points="${linePoints}" fill="none" stroke="#F6C85F" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"></polyline>
-          ${chartPoints
-            .map((point, index) => {
-              const x = xForIndex(index);
-              const y = yForValue(point.cumulativeBigBlinds);
-              return `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="2.8" fill="#F6C85F"><title>${escapeHistoryHtml(point.label)} cumulative: ${formatHistorySigned(point.cumulativeBigBlinds)} BB</title></circle>`;
-            })
-            .join("")}
-          ${chartPoints
-            .map((point, index) => {
-              if (index % labelStep !== 0 && index !== chartPoints.length - 1) {
-                return "";
-              }
-
-              return `<text x="${xForIndex(index).toFixed(1)}" y="${chartHeight - 10}" text-anchor="middle" fill="#8FB8C4" font-size="9">${escapeHistoryHtml(formatHistoryGraphLabel(point.label))}</text>`;
-            })
-            .join("")}
-        </svg>
-      </section>
-    `;
+    sessionHistoryChart = new ChartConstructor(chartElement, {
+      type: "bar",
+      data: {
+        labels: chartPoints.map((point) => point.label),
+        datasets: [
+          {
+            type: "bar",
+            label: "Net BB",
+            data: chartPoints.map((point) => point.netBigBlinds),
+            backgroundColor: chartPoints.map((point) =>
+              point.netBigBlinds >= 0 ? "rgba(110,168,254,.72)" : "rgba(255,141,122,.76)",
+            ),
+            borderColor: chartPoints.map((point) => (point.netBigBlinds >= 0 ? "#6EA8FE" : "#FF8D7A")),
+            borderWidth: 1,
+            borderRadius: 4,
+            yAxisID: "bigBlinds",
+          },
+          {
+            type: "line",
+            label: "Cumulative BB",
+            data: chartPoints.map((point) => point.cumulativeBigBlinds),
+            borderColor: "#F6C85F",
+            backgroundColor: "rgba(246,200,95,.16)",
+            borderWidth: 2,
+            pointBackgroundColor: "#F6C85F",
+            pointBorderColor: "#111820",
+            pointBorderWidth: 1,
+            pointRadius: 3,
+            pointHoverRadius: 5,
+            tension: 0.28,
+            yAxisID: "bigBlinds",
+          },
+        ],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        interaction: {
+          mode: "index",
+          intersect: false,
+        },
+        plugins: {
+          legend: {
+            labels: {
+              color: "#BFE7F1",
+              boxWidth: 10,
+              boxHeight: 10,
+              font: {
+                size: 11,
+              },
+            },
+          },
+          tooltip: {
+            callbacks: {
+              label(context) {
+                return `${context.dataset.label}: ${formatHistorySigned(context.parsed.y)} BB`;
+              },
+            },
+          },
+        },
+        scales: {
+          x: {
+            ticks: {
+              color: "#8FB8C4",
+              maxRotation: 0,
+              autoSkip: true,
+              maxTicksLimit: 5,
+              callback(value) {
+                return formatHistoryChartTickLabel(this.getLabelForValue(value));
+              },
+            },
+            grid: {
+              color: "rgba(191,231,241,.08)",
+            },
+          },
+          bigBlinds: {
+            beginAtZero: true,
+            ticks: {
+              color: "#8FB8C4",
+              callback(value) {
+                return formatHistoryAxisValue(value);
+              },
+            },
+            grid: {
+              color: "rgba(191,231,241,.12)",
+            },
+          },
+        },
+      },
+    });
   }
 
   function renderHistoryMetric(label, value, color = "#F5FAFC") {
@@ -275,10 +330,6 @@
     return "margin-bottom:6px;color:#BFE7F1;font-weight:700;";
   }
 
-  function getHistoryLegendSwatchStyle(color) {
-    return `display:inline-block;width:9px;height:9px;border-radius:2px;background:${color};margin-right:4px;vertical-align:-1px;`;
-  }
-
   function formatHistorySigned(value) {
     if (value === null || value === undefined || !Number.isFinite(Number(value))) {
       return "n/a";
@@ -309,9 +360,22 @@
     return number.toFixed(1);
   }
 
-  function formatHistoryGraphLabel(label) {
+  function formatHistoryChartTickLabel(label) {
     const text = String(label || "");
     return text.length > 12 ? `${text.slice(0, 11)}...` : text;
+  }
+
+  function getChartConstructor() {
+    return globalThis.Chart || window.Chart || pageWindow.Chart || null;
+  }
+
+  function destroySessionHistoryChart() {
+    if (!sessionHistoryChart) {
+      return;
+    }
+
+    sessionHistoryChart.destroy();
+    sessionHistoryChart = null;
   }
 
   function formatHistoryDateTime(timestamp) {

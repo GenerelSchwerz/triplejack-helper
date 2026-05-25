@@ -1,8 +1,8 @@
 ﻿// ==UserScript==
 // @name         Triplejack Helper
 // @namespace    https://triplejack.com/
-// @version      0.6.18
-// @description  Translates Triplejack public chat and direct messages using Google Translate requests.
+// @version      0.6.19
+// @description  Adds Triplejack chat translation, message tools, and session tracking helpers.
 // @author       Rocco A.
 // @license      MIT
 // @homepageURL  https://github.com/GenerelSchwerz/triplejack-helper
@@ -16,6 +16,7 @@
 // @grant        GM_xmlhttpRequest
 // @grant        GM_registerMenuCommand
 // @grant        unsafeWindow
+// @require      https://cdn.jsdelivr.net/npm/chart.js@4.5.1/dist/chart.umd.min.js
 // @connect      translate.googleapis.com
 // @run-at       document-start
 // ==/UserScript==

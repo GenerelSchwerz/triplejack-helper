@@ -6,3 +6,5 @@ For the time being, every time an agent makes a significant change and considers
 2. Rebuild and run the project check.
 3. Commit the completed change.
 4. Push the commit.
+
+When doing the git push workflow, run the project check, stage changes, commit, and push in one command with semicolons separating each step, for example: `npm run check; git add .; git commit -m "Describe change"; git push`.

@@ -50,6 +50,7 @@
   let helperPanelHost;
   let timestampObserver;
   let timestampRenderQueued = false;
+  const privateMessageTimestampsByText = new Map();
 
   function logPanelDebug(action, details = {}) {
     console.debug(PANEL_DEBUG_LOG_PREFIX, action, details);

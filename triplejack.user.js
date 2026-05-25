@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Triplejack Helper
 // @namespace    https://triplejack.com/
-// @version      0.5.7
+// @version      0.5.8
 // @description  Translates Triplejack public chat and direct messages using Google Translate requests.
 // @author       Rocco A.
 // @license      MIT
@@ -1328,6 +1328,7 @@
     startedAt: 0,
     lastUpdateAt: 0,
   };
+  let pendingSessionSummaryRender = null;
 
   function installSessionTracker() {
     document.addEventListener(SOCKET_MESSAGE_EVENT, handleSessionSocketMessage);
@@ -1396,6 +1397,7 @@
       return;
     }
 
+    cancelPendingSessionSummaryRender();
     resetSessionTracker();
 
     const selfFields = splitProtocolFields(stripOuterBraces(selfPayload));
@@ -1580,8 +1582,93 @@
     resetSessionTracker();
 
     if (summary && getSessionSummaryEnabled()) {
-      renderSessionSummary(summary);
+      scheduleSessionSummaryRender(summary);
     }
+  }
+
+  function scheduleSessionSummaryRender(summary) {
+    cancelPendingSessionSummaryRender();
+
+    let finished = false;
+    let timerId = 0;
+    const startedAt = performance.now();
+    let lastMotionAt = startedAt;
+    const minimumWaitMs = 500;
+    const quietWaitMs = 180;
+    const maximumWaitMs = 2500;
+
+    const cleanup = () => {
+      document.removeEventListener("transitionrun", markMotion, true);
+      document.removeEventListener("transitionstart", markMotion, true);
+      document.removeEventListener("transitionend", markMotion, true);
+      document.removeEventListener("transitioncancel", markMotion, true);
+      document.removeEventListener("animationstart", markMotion, true);
+      document.removeEventListener("animationend", markMotion, true);
+      document.removeEventListener("animationcancel", markMotion, true);
+      window.clearTimeout(timerId);
+      pendingSessionSummaryRender = null;
+    };
+
+    const finish = () => {
+      if (finished) {
+        return;
+      }
+
+      finished = true;
+      cleanup();
+      renderSessionSummary(summary);
+    };
+
+    function markMotion() {
+      lastMotionAt = performance.now();
+    }
+
+    function hasRunningPageAnimations() {
+      if (typeof document.getAnimations !== "function") {
+        return false;
+      }
+
+      return document.getAnimations({ subtree: true }).some((animation) => {
+        const target = animation.effect?.target;
+        if (sessionSummaryPanel?.contains?.(target)) {
+          return false;
+        }
+
+        return animation.playState === "running" || animation.playState === "pending";
+      });
+    }
+
+    const tick = () => {
+      const now = performance.now();
+      if (hasRunningPageAnimations()) {
+        lastMotionAt = now;
+      }
+
+      if (now - startedAt >= maximumWaitMs || (now - startedAt >= minimumWaitMs && now - lastMotionAt >= quietWaitMs)) {
+        finish();
+        return;
+      }
+
+      timerId = window.setTimeout(tick, 80);
+    };
+
+    document.addEventListener("transitionrun", markMotion, true);
+    document.addEventListener("transitionstart", markMotion, true);
+    document.addEventListener("transitionend", markMotion, true);
+    document.addEventListener("transitioncancel", markMotion, true);
+    document.addEventListener("animationstart", markMotion, true);
+    document.addEventListener("animationend", markMotion, true);
+    document.addEventListener("animationcancel", markMotion, true);
+
+    pendingSessionSummaryRender = {
+      cancel: cleanup,
+    };
+    tick();
+  }
+
+  function cancelPendingSessionSummaryRender() {
+    pendingSessionSummaryRender?.cancel();
+    pendingSessionSummaryRender = null;
   }
 
   function buildSessionSummary() {

@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Triplejack Helper
 // @namespace    https://triplejack.com/
-// @version      0.8.15
+// @version      0.8.16
 // @description  Adds Triplejack chat translation, message tools, and session tracking helpers.
 // @author       Rocco A.
 // @license      MIT
@@ -597,6 +597,10 @@
 
   // Quick bomb controller
   function quickBombControllerModule(config) {
+    const AMMO_COST_BY_ITEM_KEY = {
+      pie: 2,
+    };
+
     const state = {
       lastPacket: "",
       lastItemKey: "",
@@ -686,7 +690,7 @@
       state.active = true;
       state.runSent = 0;
       state.targetSends = getTargetSends();
-      setStatus(`quick bomb started ${state.lastItemKey}`);
+      setStatus(`quick bomb started ${state.lastItemKey} x${state.targetSends}`);
       if (getSpeedMode() === "instant") {
         sendInstantBombs();
         return;
@@ -757,10 +761,18 @@
 
     function getTargetSends() {
       if (getMode() === "ammo") {
-        return getAmmo();
+        return getAmmoTargetSends();
       }
 
       return Math.max(1, getRate() * getDurationSeconds());
+    }
+
+    function getAmmoTargetSends() {
+      return Math.floor(getAmmo() / getAmmoCost(state.lastItemKey));
+    }
+
+    function getAmmoCost(itemKey) {
+      return AMMO_COST_BY_ITEM_KEY[String(itemKey || "").toLowerCase()] || 1;
     }
 
     function getIntervalMs() {

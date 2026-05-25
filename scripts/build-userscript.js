@@ -21,6 +21,7 @@ const sections = [
   ["Session history store", "features/session/history.js"],
   ["Session history panel", "features/session/history-panel.js"],
   ["Session tracker", "features/session/tracker.js"],
+  ["Quick bomb panel", "features/bombs/panel.js"],
   ["Settings panel", "ui/panel.js"],
   ["Startup", "core/main.js"],
 ];

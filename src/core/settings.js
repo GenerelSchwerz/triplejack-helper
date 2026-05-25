@@ -23,10 +23,8 @@
   }
 
   function getQuickBombRate() {
-    return clampNumber(
+    return normalizePositiveInteger(
       localStorage.getItem(QUICK_BOMB_RATE_STORAGE_KEY) || QUICK_BOMB_DEFAULT_RATE,
-      QUICK_BOMB_MIN_RATE,
-      QUICK_BOMB_MAX_RATE,
       QUICK_BOMB_DEFAULT_RATE,
     );
   }
@@ -41,19 +39,15 @@
   }
 
   function getQuickBombDuration() {
-    return clampNumber(
+    return normalizePositiveInteger(
       localStorage.getItem(QUICK_BOMB_DURATION_STORAGE_KEY) || QUICK_BOMB_DEFAULT_DURATION_SECONDS,
-      QUICK_BOMB_MIN_DURATION_SECONDS,
-      QUICK_BOMB_MAX_DURATION_SECONDS,
       QUICK_BOMB_DEFAULT_DURATION_SECONDS,
     );
   }
 
   function getQuickBombAmmo() {
-    return clampNumber(
+    return normalizePositiveInteger(
       localStorage.getItem(QUICK_BOMB_AMMO_STORAGE_KEY) || QUICK_BOMB_DEFAULT_AMMO,
-      QUICK_BOMB_MIN_AMMO,
-      QUICK_BOMB_MAX_AMMO,
       QUICK_BOMB_DEFAULT_AMMO,
     );
   }
@@ -118,13 +112,15 @@
     localStorage.setItem(QUICK_BOMB_ENABLED_STORAGE_KEY, enabled ? "1" : "0");
     setStatus(`quick bomb ${enabled ? "enabled" : "disabled"}`);
     renderStatusPanel();
+    renderQuickBombPanel();
   }
 
   function setQuickBombRate(rate) {
-    const value = clampNumber(rate, QUICK_BOMB_MIN_RATE, QUICK_BOMB_MAX_RATE, QUICK_BOMB_DEFAULT_RATE);
+    const value = normalizePositiveInteger(rate, QUICK_BOMB_DEFAULT_RATE);
     localStorage.setItem(QUICK_BOMB_RATE_STORAGE_KEY, String(value));
     setStatus(`quick bomb rate set to ${value}/s`);
     renderStatusPanel();
+    renderQuickBombPanel();
   }
 
   function setQuickBombSpeedMode(mode) {
@@ -132,6 +128,7 @@
     localStorage.setItem(QUICK_BOMB_SPEED_MODE_STORAGE_KEY, value);
     setStatus(`quick bomb speed set to ${value}`);
     renderStatusPanel();
+    renderQuickBombPanel();
   }
 
   function setQuickBombMode(mode) {
@@ -139,31 +136,29 @@
     localStorage.setItem(QUICK_BOMB_MODE_STORAGE_KEY, value);
     setStatus(`quick bomb mode set to ${value}`);
     renderStatusPanel();
+    renderQuickBombPanel();
   }
 
   function setQuickBombDuration(durationSeconds) {
-    const value = clampNumber(
-      durationSeconds,
-      QUICK_BOMB_MIN_DURATION_SECONDS,
-      QUICK_BOMB_MAX_DURATION_SECONDS,
-      QUICK_BOMB_DEFAULT_DURATION_SECONDS,
-    );
+    const value = normalizePositiveInteger(durationSeconds, QUICK_BOMB_DEFAULT_DURATION_SECONDS);
     localStorage.setItem(QUICK_BOMB_DURATION_STORAGE_KEY, String(value));
     setStatus(`quick bomb duration set to ${value}s`);
     renderStatusPanel();
+    renderQuickBombPanel();
   }
 
   function setQuickBombAmmo(ammo) {
-    const value = clampNumber(ammo, QUICK_BOMB_MIN_AMMO, QUICK_BOMB_MAX_AMMO, QUICK_BOMB_DEFAULT_AMMO);
+    const value = normalizePositiveInteger(ammo, QUICK_BOMB_DEFAULT_AMMO);
     localStorage.setItem(QUICK_BOMB_AMMO_STORAGE_KEY, String(value));
     setStatus(`quick bomb ammo set to ${value}`);
     renderStatusPanel();
+    renderQuickBombPanel();
   }
 
-  function sendQuickBombControl(action) {
+  function sendQuickBombControl(action, detail = {}) {
     document.dispatchEvent(
       new CustomEvent(QUICK_BOMB_CONTROL_EVENT, {
-        detail: { action },
+        detail: { ...detail, action },
       }),
     );
   }
@@ -201,6 +196,15 @@
     }
 
     return Math.min(max, Math.max(min, Math.round(numericValue)));
+  }
+
+  function normalizePositiveInteger(value, fallback) {
+    const numericValue = Number(value);
+    if (!Number.isFinite(numericValue) || numericValue <= 0) {
+      return fallback;
+    }
+
+    return Math.round(numericValue);
   }
 
   function normalizeLanguageCode(language) {

@@ -175,6 +175,11 @@
         title: "Session History",
         label: "📈",
       },
+      {
+        id: QUICK_BOMB_PANEL_ID,
+        title: "Quick Bomb",
+        label: "💣",
+      },
     ];
   }
 

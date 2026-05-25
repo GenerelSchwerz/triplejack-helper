@@ -19,14 +19,8 @@
   const QUICK_BOMB_KEY = "B";
   const QUICK_BOMB_CONTROL_EVENT = "tj-helper-quick-bomb-control";
   const QUICK_BOMB_DEFAULT_RATE = 8;
-  const QUICK_BOMB_MIN_RATE = 1;
-  const QUICK_BOMB_MAX_RATE = 30;
   const QUICK_BOMB_DEFAULT_DURATION_SECONDS = 3;
-  const QUICK_BOMB_MIN_DURATION_SECONDS = 1;
-  const QUICK_BOMB_MAX_DURATION_SECONDS = 30;
   const QUICK_BOMB_DEFAULT_AMMO = 20;
-  const QUICK_BOMB_MIN_AMMO = 1;
-  const QUICK_BOMB_MAX_AMMO = 300;
   const LANGUAGE_OPTIONS = [
     ["en", "English"],
     ["es", "Spanish"],
@@ -62,6 +56,9 @@
     activePanelId: "",
     quickBombLastItem: "",
     quickBombAmmoCost: 1,
+    quickBombInRoom: false,
+    quickBombPlayers: [],
+    quickBombSelectedPlayerId: "",
     quickBombReplayCount: 0,
     quickBombActive: false,
     quickBombRemaining: 0,
@@ -69,6 +66,7 @@
   let statusPanel;
   let sessionSummaryPanel;
   let sessionHistoryPanel;
+  let quickBombPanel;
   let helperPanelHost;
   let timestampObserver;
   let timestampRenderQueued = false;

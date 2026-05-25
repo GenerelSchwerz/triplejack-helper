@@ -13,7 +13,7 @@ Open the raw `triplejack.user.js` file from this repository in your browser and 
 - Optional translation for sent public chat and direct messages.
 - Configurable incoming and outgoing target languages.
 - Optional message timestamps.
-- Quick bomb spammer: tracks the last bomb packet you throw and replays it by rate, duration, ammo count, or instant burst with `Ctrl+Shift+B`.
+- Quick bomb spammer: provides a dedicated panel, tracks the last bomb packet you throw, targets selected room players, and replays by rate, duration, ammo count, or instant burst with `Ctrl+Shift+B`.
 - Ammo count mode converts ammo to throw packets using item costs learned from websocket item-definition frames.
 - Optional table session summary when leaving a room.
 - Persistent session history with date, room type, and period filters.

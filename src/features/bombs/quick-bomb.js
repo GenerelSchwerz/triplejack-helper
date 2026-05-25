@@ -5,6 +5,9 @@
       nativeSend: null,
       socketId: "",
       ammoCostByItemKey: new Map(),
+      inRoom: false,
+      players: [],
+      selectedTarget: null,
       replayCount: 0,
       lastReplayAt: 0,
       active: false,
@@ -71,6 +74,11 @@
 
       if (action === "toggle") {
         toggleSpam();
+        return;
+      }
+
+      if (action === "selectTarget") {
+        selectTarget(event.detail);
       }
     }
 
@@ -94,6 +102,11 @@
         return;
       }
 
+      if (!state.inRoom || !state.selectedTarget) {
+        setStatus("quick bomb needs a room target");
+        return;
+      }
+
       stopTimer();
       state.active = true;
       state.runSent = 0;
@@ -109,7 +122,7 @@
 
     function sendInstantBombs() {
       while (state.active && state.runSent < state.targetSends) {
-        state.nativeSend(state.lastPacket);
+        state.nativeSend(buildTargetedBombPacket());
         state.runSent += 1;
         state.replayCount += 1;
         state.lastReplayAt = Date.now();
@@ -133,12 +146,17 @@
         return;
       }
 
+      if (!state.inRoom || !state.selectedTarget) {
+        stopSpam("quick bomb needs a room target");
+        return;
+      }
+
       if (state.runSent >= state.targetSends) {
         stopSpam(`quick bomb finished ${state.runSent}`);
         return;
       }
 
-      state.nativeSend(state.lastPacket);
+      state.nativeSend(buildTargetedBombPacket());
       state.runSent += 1;
       state.replayCount += 1;
       state.lastReplayAt = Date.now();
@@ -183,7 +201,23 @@
       return state.ammoCostByItemKey.get(normalizeItemKey(itemKey)) || 1;
     }
 
+    function buildTargetedBombPacket() {
+      if (!state.lastPacket.startsWith("newbomb:")) {
+        return state.lastPacket;
+      }
+
+      const fields = splitProtocolFields(state.lastPacket.slice("newbomb:".length));
+      if (fields.length < 3) {
+        return state.lastPacket;
+      }
+
+      fields[2] = String(state.selectedTarget.seat);
+      return `newbomb:${fields.join(",")}`;
+    }
+
     function updateAmmoCosts(data) {
+      updateRoomState(data);
+
       if (data.startsWith("inventory_defs:")) {
         updateAmmoCostsFromInventoryDefs(data.slice("inventory_defs:".length));
         return;
@@ -192,6 +226,67 @@
       if (data.startsWith("bombs_init:")) {
         updateAmmoCostsFromBombsInit(data.slice("bombs_init:".length));
       }
+    }
+
+    function updateRoomState(data) {
+      if (data.startsWith("#(init_game):")) {
+        updateRoomPlayersFromInitGame(data);
+        return;
+      }
+
+      if (getPacketCommand(data) === "gamesdone") {
+        state.inRoom = false;
+        state.players = [];
+        state.selectedTarget = null;
+        if (state.active) {
+          stopSpam("quick bomb left room");
+          return;
+        }
+
+        setStatus("quick bomb left room");
+      }
+    }
+
+    function updateRoomPlayersFromInitGame(data) {
+      const gamePayload = getCompoundSubframe(data, "init_game_data");
+      if (!gamePayload) {
+        return;
+      }
+
+      const gameFields = splitProtocolFields(gamePayload);
+      const players = splitProtocolFields(stripOuterBraces(gameFields[7] || ""))
+        .map(parseRoomPlayerRow)
+        .filter((player) => player.playerId && player.seat !== "" && Number(player.seat) >= 0);
+
+      state.inRoom = true;
+      state.players = players;
+      if (!players.some((player) => player.playerId === state.selectedTarget?.playerId)) {
+        state.selectedTarget = null;
+      }
+
+      setStatus(`quick bomb room targets ${players.length}`);
+    }
+
+    function parseRoomPlayerRow(rowText) {
+      const fields = splitProtocolFields(stripOuterBraces(rowText));
+      return {
+        playerId: fields[2] || "",
+        playerName: decodeProtocolText(fields[3] || ""),
+        seat: fields[8] || "",
+      };
+    }
+
+    function selectTarget(detail) {
+      const target = state.players.find((player) => {
+        return player.playerId === String(detail?.playerId || "") && player.seat === String(detail?.seat || "");
+      });
+      if (!target) {
+        setStatus("quick bomb target unavailable");
+        return;
+      }
+
+      state.selectedTarget = target;
+      setStatus(`quick bomb target ${target.playerName}`);
     }
 
     function updateAmmoCostsFromInventoryDefs(payload) {
@@ -237,6 +332,33 @@
       }
 
       return text;
+    }
+
+    function getCompoundSubframe(data, name) {
+      const markerPattern = new RegExp(`(?:^|/)\\d+/${name}:`, "g");
+      const markerMatch = markerPattern.exec(data);
+      if (!markerMatch) {
+        return "";
+      }
+
+      const start = markerPattern.lastIndex;
+      const nextPattern = /\/\d+\/[a-zA-Z_]+:/g;
+      nextPattern.lastIndex = start;
+      const nextMatch = nextPattern.exec(data);
+      return data.slice(start, nextMatch ? nextMatch.index : undefined);
+    }
+
+    function getPacketCommand(data) {
+      const colonIndex = data.indexOf(":");
+      return colonIndex === -1 ? data : data.slice(0, colonIndex);
+    }
+
+    function decodeProtocolText(value) {
+      try {
+        return decodeURIComponent(String(value || "").replace(/\+/g, "%20"));
+      } catch {
+        return String(value || "");
+      }
     }
 
     function splitProtocolFields(value) {
@@ -288,10 +410,8 @@
     }
 
     function getRate() {
-      return clampNumber(
+      return normalizePositiveInteger(
         window.localStorage?.getItem(config.rateStorageKey) || config.defaultRate,
-        config.minRate,
-        config.maxRate,
         config.defaultRate,
       );
     }
@@ -305,30 +425,26 @@
     }
 
     function getDurationSeconds() {
-      return clampNumber(
+      return normalizePositiveInteger(
         window.localStorage?.getItem(config.durationStorageKey) || config.defaultDurationSeconds,
-        config.minDurationSeconds,
-        config.maxDurationSeconds,
         config.defaultDurationSeconds,
       );
     }
 
     function getAmmo() {
-      return clampNumber(
+      return normalizePositiveInteger(
         window.localStorage?.getItem(config.ammoStorageKey) || config.defaultAmmo,
-        config.minAmmo,
-        config.maxAmmo,
         config.defaultAmmo,
       );
     }
 
-    function clampNumber(value, min, max, fallback) {
+    function normalizePositiveInteger(value, fallback) {
       const numericValue = Number(value);
-      if (!Number.isFinite(numericValue)) {
+      if (!Number.isFinite(numericValue) || numericValue <= 0) {
         return fallback;
       }
 
-      return Math.min(max, Math.max(min, Math.round(numericValue)));
+      return Math.round(numericValue);
     }
 
     function setStatus(status) {
@@ -340,6 +456,9 @@
             quickBombSocketId: state.socketId,
             quickBombLastReplayAt: state.lastReplayAt,
             quickBombAmmoCost: getAmmoCost(state.lastItemKey),
+            quickBombInRoom: state.inRoom,
+            quickBombPlayers: state.players,
+            quickBombSelectedPlayerId: state.selectedTarget?.playerId || "",
             quickBombActive: state.active,
             quickBombRemaining: state.active ? Math.max(0, state.targetSends - state.runSent) : 0,
             lastStatus: status,

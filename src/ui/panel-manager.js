@@ -1,5 +1,6 @@
   const SETTINGS_PANEL_ID = "settings";
   const SESSION_HISTORY_PANEL_ID = "session-history";
+  const QUICK_BOMB_PANEL_ID = "quick-bomb";
   let nativePanelWrapperClassName = "";
   let nativePanelAsideClassName = "";
   let pendingHelperPanelOpenId = 0;
@@ -99,6 +100,7 @@
 
     renderStatusPanel();
     renderSessionHistoryPanel();
+    renderQuickBombPanel();
     renderToolbarButtons();
     syncNativePanelButtonsForHelper();
   }
@@ -960,6 +962,10 @@
 
     if (state.activePanelId === SESSION_HISTORY_PANEL_ID) {
       return sessionHistoryPanel || helperPanelHost;
+    }
+
+    if (state.activePanelId === QUICK_BOMB_PANEL_ID) {
+      return quickBombPanel || helperPanelHost;
     }
 
     return null;

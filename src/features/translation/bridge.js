@@ -93,6 +93,7 @@
       Object.assign(state, event.detail);
       log(state.lastStatus);
       renderStatusPanel();
+      renderQuickBombPanel();
     });
   }
 
@@ -126,14 +127,8 @@
       ammoStorageKey: QUICK_BOMB_AMMO_STORAGE_KEY,
       hotkey: QUICK_BOMB_KEY,
       defaultRate: QUICK_BOMB_DEFAULT_RATE,
-      minRate: QUICK_BOMB_MIN_RATE,
-      maxRate: QUICK_BOMB_MAX_RATE,
       defaultDurationSeconds: QUICK_BOMB_DEFAULT_DURATION_SECONDS,
-      minDurationSeconds: QUICK_BOMB_MIN_DURATION_SECONDS,
-      maxDurationSeconds: QUICK_BOMB_MAX_DURATION_SECONDS,
       defaultAmmo: QUICK_BOMB_DEFAULT_AMMO,
-      minAmmo: QUICK_BOMB_MIN_AMMO,
-      maxAmmo: QUICK_BOMB_MAX_AMMO,
     })});
       translationController.install();
       quickBombController.install();

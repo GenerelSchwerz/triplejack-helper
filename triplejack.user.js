@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Triplejack Helper
 // @namespace    https://triplejack.com/
-// @version      0.6.3
+// @version      0.6.4
 // @description  Translates Triplejack public chat and direct messages using Google Translate requests.
 // @author       Rocco A.
 // @license      MIT
@@ -54,6 +54,7 @@
   const PACKET_INTERCEPT_EVENT = "tj-helper-websocket-packet";
   const SOCKET_MESSAGE_EVENT = "tj-helper-websocket-message";
   const STATUS_EVENT = "tj-helper-status";
+  const HELPER_PANEL_WIDTH = 390;
   const pageWindow = typeof unsafeWindow === "undefined" ? window : unsafeWindow;
   const translationCache = new Map();
   const state = {
@@ -67,6 +68,7 @@
   let statusPanel;
   let sessionSummaryPanel;
   let sessionHistoryPanel;
+  let helperPanelHost;
   let outsideClickDismissalInstalled = false;
   let timestampObserver;
   let timestampRenderQueued = false;
@@ -944,18 +946,121 @@
   }
 
   function renderHelperPanels() {
+    if (!state.activePanelId) {
+      removeHelperPanelHost();
+    } else {
+      getHelperPanelMount();
+    }
+
     renderStatusPanel();
     renderSessionHistoryPanel();
     renderToolbarButtons();
   }
 
+  function getHelperPanelMount() {
+    if (!state.activePanelId || !document.documentElement) {
+      return null;
+    }
+
+    const panelContainer = getNativePanelContainer();
+    if (!panelContainer) {
+      return null;
+    }
+
+    if (helperPanelHost && panelContainer.contains(helperPanelHost)) {
+      return helperPanelHost;
+    }
+
+    removeHelperPanelHost();
+
+    const nativeWrapper = panelContainer.querySelector(":scope > div:not([data-tj-helper-panel-wrapper])");
+    const nativeAside = panelContainer.querySelector("aside.scaling-panel-container");
+    const wrapper = document.createElement("div");
+    wrapper.dataset.tjHelperPanelWrapper = "1";
+    if (nativeWrapper?.className) {
+      wrapper.className = nativeWrapper.className;
+    }
+    wrapper.style.cssText = [
+      "height:100%",
+      "min-width:0",
+      "display:flex",
+      "align-items:stretch",
+    ].join(";");
+
+    const aside = document.createElement("aside");
+    aside.className = nativeAside?.className || "scaling-panel-container";
+    aside.dataset.tjHelperPanelHost = "1";
+    aside.setAttribute("aria-label", "Triplejack Helper panel");
+    aside.style.cssText = [
+      `width:${HELPER_PANEL_WIDTH}px`,
+      `max-width:min(${HELPER_PANEL_WIDTH}px,calc(100vw - 64px))`,
+      "height:100%",
+      "min-width:0",
+      "box-sizing:border-box",
+      "overflow:hidden",
+      "display:flex",
+      "flex-direction:column",
+      "background:rgba(18,31,39,.96)",
+      "color:#F5FAFC",
+      "border-left:1px solid rgba(137,198,215,.55)",
+    ].join(";");
+
+    wrapper.appendChild(aside);
+    panelContainer.appendChild(wrapper);
+    helperPanelHost = aside;
+    return helperPanelHost;
+  }
+
+  function removeHelperPanelHost() {
+    const hostRoot = helperPanelHost?.closest?.("[data-tj-helper-panel-wrapper]") || helperPanelHost;
+    hostRoot?.remove();
+    helperPanelHost = null;
+  }
+
+  function getNativePanelContainer() {
+    const existingPanelContainer = document.querySelector('[data-testid="panel-container"]');
+    if (existingPanelContainer) {
+      return existingPanelContainer;
+    }
+
+    const stageContainer = document.querySelector('[data-testid="poker-stage-container"]');
+    const sceneRow = stageContainer?.parentElement;
+    if (!sceneRow) {
+      return null;
+    }
+
+    const panelRegion = document.createElement("div");
+    panelRegion.dataset.tjHelperPanelRegion = "1";
+    panelRegion.style.cssText = [
+      "height:100%",
+      "min-width:0",
+      "display:flex",
+      "align-items:stretch",
+      "flex:0 0 auto",
+    ].join(";");
+
+    const panelContainer = document.createElement("div");
+    panelContainer.setAttribute("data-testid", "panel-container");
+    panelContainer.dataset.tjHelperPanelContainer = "1";
+    panelContainer.style.cssText = [
+      "height:100%",
+      "min-width:0",
+      "display:flex",
+      "align-items:stretch",
+    ].join(";");
+
+    panelRegion.appendChild(panelContainer);
+    sceneRow.appendChild(panelRegion);
+    return panelContainer;
+  }
+
   function getActiveHelperPanelElement() {
     if (state.activePanelId === SETTINGS_PANEL_ID) {
-      return statusPanel;
+      return statusPanel || helperPanelHost;
     }
 
     if (state.activePanelId === SESSION_HISTORY_PANEL_ID) {
-      return sessionHistoryPanel;
+      return sessionHistoryPanel || helperPanelHost;
     }
 
     return null;
@@ -1622,28 +1727,28 @@
       return;
     }
 
+    const panelMount = getHelperPanelMount();
+    if (!panelMount) {
+      return;
+    }
+
     if (sessionHistoryPanel) {
+      if (sessionHistoryPanel.parentNode !== panelMount) {
+        panelMount.replaceChildren(sessionHistoryPanel);
+      }
       renderSessionHistoryPanelBody();
       return;
     }
 
     sessionHistoryPanel = document.createElement("div");
     sessionHistoryPanel.style.cssText = [
-      "position:fixed",
-      "left:50%",
-      "top:50%",
-      "z-index:2147483646",
-      "transform:translate(-50%,-50%)",
-      "width:min(820px,calc(100vw - 28px))",
-      "max-height:min(760px,calc(100vh - 28px))",
+      "width:100%",
+      "height:100%",
+      "box-sizing:border-box",
       "overflow:auto",
       "padding:14px",
-      "border:1px solid rgba(137,198,215,.9)",
-      "border-radius:8px",
-      "background:rgba(18,31,39,.98)",
       "color:#F5FAFC",
       "font:12px/1.35 Arial,sans-serif",
-      "box-shadow:0 12px 36px rgba(0,0,0,.5)",
     ].join(";");
 
     const dateRange = getSessionHistoryDateRange();
@@ -1687,7 +1792,7 @@
       control.addEventListener("change", renderSessionHistoryPanelBody);
     }
 
-    (document.body || document.documentElement).appendChild(sessionHistoryPanel);
+    panelMount.replaceChildren(sessionHistoryPanel);
     renderSessionHistoryPanelBody();
   }
 
@@ -2468,23 +2573,21 @@
       return;
     }
 
+    const panelMount = getHelperPanelMount();
+    if (!panelMount) {
+      return;
+    }
+
     if (!statusPanel) {
       statusPanel = document.createElement("div");
       statusPanel.style.cssText = [
-        "position:fixed",
-        "right:8px",
-        "top:48px",
-        "z-index:2147483647",
-        "width:min(380px,calc(100vw - 16px))",
-        "max-height:calc(100vh - 64px)",
+        "width:100%",
+        "height:100%",
+        "box-sizing:border-box",
         "overflow:auto",
         "padding:12px",
-        "border:1px solid #2D6F89",
-        "border-radius:6px",
-        "background:rgba(18,31,39,.96)",
         "color:#F5FAFC",
         "font:12px/1.35 Arial,sans-serif",
-        "box-shadow:0 4px 16px rgba(0,0,0,.32)",
       ].join(";");
       statusPanel.innerHTML = `
         <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:10px;">
@@ -2613,9 +2716,8 @@
     statsElement.textContent = `${state.hooked ? "hooked" : "not hooked"} | sockets ${state.sockets}, messages ${state.chatsSeen}, translations ${state.translationsShown}`;
     statusElement.textContent = state.lastStatus;
 
-    const parent = document.body || document.documentElement;
-    if (statusPanel.parentNode !== parent) {
-      parent.appendChild(statusPanel);
+    if (statusPanel.parentNode !== panelMount) {
+      panelMount.replaceChildren(statusPanel);
     }
 
   }

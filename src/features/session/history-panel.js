@@ -9,28 +9,28 @@
       return;
     }
 
+    const panelMount = getHelperPanelMount();
+    if (!panelMount) {
+      return;
+    }
+
     if (sessionHistoryPanel) {
+      if (sessionHistoryPanel.parentNode !== panelMount) {
+        panelMount.replaceChildren(sessionHistoryPanel);
+      }
       renderSessionHistoryPanelBody();
       return;
     }
 
     sessionHistoryPanel = document.createElement("div");
     sessionHistoryPanel.style.cssText = [
-      "position:fixed",
-      "left:50%",
-      "top:50%",
-      "z-index:2147483646",
-      "transform:translate(-50%,-50%)",
-      "width:min(820px,calc(100vw - 28px))",
-      "max-height:min(760px,calc(100vh - 28px))",
+      "width:100%",
+      "height:100%",
+      "box-sizing:border-box",
       "overflow:auto",
       "padding:14px",
-      "border:1px solid rgba(137,198,215,.9)",
-      "border-radius:8px",
-      "background:rgba(18,31,39,.98)",
       "color:#F5FAFC",
       "font:12px/1.35 Arial,sans-serif",
-      "box-shadow:0 12px 36px rgba(0,0,0,.5)",
     ].join(";");
 
     const dateRange = getSessionHistoryDateRange();
@@ -74,7 +74,7 @@
       control.addEventListener("change", renderSessionHistoryPanelBody);
     }
 
-    (document.body || document.documentElement).appendChild(sessionHistoryPanel);
+    panelMount.replaceChildren(sessionHistoryPanel);
     renderSessionHistoryPanelBody();
   }
 

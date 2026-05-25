@@ -9,23 +9,21 @@
       return;
     }
 
+    const panelMount = getHelperPanelMount();
+    if (!panelMount) {
+      return;
+    }
+
     if (!statusPanel) {
       statusPanel = document.createElement("div");
       statusPanel.style.cssText = [
-        "position:fixed",
-        "right:8px",
-        "top:48px",
-        "z-index:2147483647",
-        "width:min(380px,calc(100vw - 16px))",
-        "max-height:calc(100vh - 64px)",
+        "width:100%",
+        "height:100%",
+        "box-sizing:border-box",
         "overflow:auto",
         "padding:12px",
-        "border:1px solid #2D6F89",
-        "border-radius:6px",
-        "background:rgba(18,31,39,.96)",
         "color:#F5FAFC",
         "font:12px/1.35 Arial,sans-serif",
-        "box-shadow:0 4px 16px rgba(0,0,0,.32)",
       ].join(";");
       statusPanel.innerHTML = `
         <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:10px;">
@@ -154,9 +152,8 @@
     statsElement.textContent = `${state.hooked ? "hooked" : "not hooked"} | sockets ${state.sockets}, messages ${state.chatsSeen}, translations ${state.translationsShown}`;
     statusElement.textContent = state.lastStatus;
 
-    const parent = document.body || document.documentElement;
-    if (statusPanel.parentNode !== parent) {
-      parent.appendChild(statusPanel);
+    if (statusPanel.parentNode !== panelMount) {
+      panelMount.replaceChildren(statusPanel);
     }
 
   }

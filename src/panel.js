@@ -63,6 +63,7 @@
               <span>Summary on leave</span>
               <input data-tj-helper-session-summary-enabled type="checkbox" style="margin:0;" />
             </label>
+            <div data-tj-helper-session-tracking-stats style="margin-top:8px;color:#D6EEF5;"></div>
           </section>
           <div style="border-top:1px solid rgba(191,231,241,.22);padding-top:8px;">
             <div style="margin-bottom:6px;color:#E9F7FA;font-weight:700;">Status</div>
@@ -136,6 +137,7 @@
     const customOutgoingLanguageInput = statusPanel.querySelector("[data-tj-helper-custom-outgoing-language]");
     const messageTimestampsInput = statusPanel.querySelector("[data-tj-helper-message-timestamps-enabled]");
     const sessionSummaryInput = statusPanel.querySelector("[data-tj-helper-session-summary-enabled]");
+    const sessionTrackingStatsElement = statusPanel.querySelector("[data-tj-helper-session-tracking-stats]");
     const statsElement = statusPanel.querySelector("[data-tj-helper-stats]");
     const statusElement = statusPanel.querySelector("[data-tj-helper-status]");
 
@@ -152,6 +154,7 @@
     customOutgoingLanguageInput.value = outgoingTargetLanguage;
     messageTimestampsInput.checked = getMessageTimestampsEnabled();
     sessionSummaryInput.checked = getSessionSummaryEnabled();
+    sessionTrackingStatsElement.innerHTML = renderSessionTrackingStats();
     statsElement.textContent = `${state.hooked ? "hooked" : "not hooked"} | sockets ${state.sockets}, messages ${state.chatsSeen}, translations ${state.translationsShown}`;
     statusElement.textContent = state.lastStatus;
 
@@ -161,4 +164,90 @@
     }
 
     renderToolbarButtons();
+  }
+
+  function renderSessionTrackingStats() {
+    const trackingStats = getSessionTrackingStats();
+    if (!trackingStats.overall.sessions) {
+      return `<div style="color:#8FB8C4;">No tracked sessions yet.</div>`;
+    }
+
+    const roomRows = trackingStats.byRoomType
+      .map((roomStats) => {
+        return `
+          <div style="display:grid;grid-template-columns:minmax(0,1fr) auto;gap:6px;">
+            <span style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${escapePanelAttribute(roomStats.roomType)}">${escapePanelHtml(roomStats.roomType)}</span>
+            <strong style="color:${getSessionStatColor(roomStats.bigBlindDelta)};">${formatSessionStatSigned(roomStats.bigBlindsPerHour)}/h</strong>
+          </div>
+        `;
+      })
+      .join("");
+
+    const recentRows = trackingStats.recentSessions
+      .map((session) => {
+        return `
+          <div style="display:grid;grid-template-columns:76px minmax(0,1fr) auto;gap:6px;align-items:center;">
+            <span style="color:#8FB8C4;">${formatSessionDate(session.endedAt)}</span>
+            <span style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${escapePanelAttribute(session.roomType || "")}">${escapePanelHtml(session.roomType || "Unknown room")}</span>
+            <strong style="color:${getSessionStatColor(session.bigBlindDelta)};">${formatSessionStatSigned(session.bigBlindDelta)} BB</strong>
+          </div>
+        `;
+      })
+      .join("");
+
+    return `
+      <div style="margin-top:8px;border-top:1px solid rgba(191,231,241,.16);padding-top:8px;">
+        <div style="display:grid;grid-template-columns:1fr auto;gap:6px;margin-bottom:6px;">
+          <span style="color:#BFE7F1;">Overall</span>
+          <strong style="color:${getSessionStatColor(trackingStats.overall.bigBlindDelta)};">${formatSessionStatSigned(trackingStats.overall.bigBlindsPerHour)}/h</strong>
+          <span style="color:#8FB8C4;">${trackingStats.overall.sessions} sessions</span>
+          <span style="color:${getSessionStatColor(trackingStats.overall.bigBlindDelta)};">${formatSessionStatSigned(trackingStats.overall.bigBlindDelta)} BB</span>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr auto;gap:6px;margin-bottom:8px;">
+          <span style="color:#BFE7F1;">Recent 5</span>
+          <strong style="color:${getSessionStatColor(trackingStats.recentTrend.bigBlindDelta)};">${formatSessionStatSigned(trackingStats.recentTrend.bigBlindsPerHour)}/h</strong>
+          <span style="color:#8FB8C4;">Previous 5</span>
+          <span style="color:${getSessionStatColor(trackingStats.previousTrend.bigBlindDelta)};">${formatSessionStatSigned(trackingStats.previousTrend.bigBlindsPerHour)}/h</span>
+        </div>
+        <div style="margin-bottom:4px;color:#BFE7F1;">By room type</div>
+        <div style="display:grid;gap:4px;margin-bottom:8px;">${roomRows}</div>
+        <div style="margin-bottom:4px;color:#BFE7F1;">Recent sessions</div>
+        <div style="display:grid;gap:4px;">${recentRows}</div>
+      </div>
+    `;
+  }
+
+  function formatSessionStatSigned(value) {
+    if (value === null || value === undefined || !Number.isFinite(value)) {
+      return "n/a";
+    }
+
+    return `${value >= 0 ? "+" : ""}${value.toFixed(1)}`;
+  }
+
+  function getSessionStatColor(value) {
+    if (value === null || value === undefined || !Number.isFinite(value)) {
+      return "#8FB8C4";
+    }
+
+    return value >= 0 ? "#A7D8AD" : "#FFB0A8";
+  }
+
+  function formatSessionDate(timestamp) {
+    return new Date(timestamp).toLocaleDateString([], { month: "numeric", day: "numeric" }) +
+      " " +
+      new Date(timestamp).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+  }
+
+  function escapePanelHtml(value) {
+    return String(value)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#039;");
+  }
+
+  function escapePanelAttribute(value) {
+    return escapePanelHtml(value);
   }

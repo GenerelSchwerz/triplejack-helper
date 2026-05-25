@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Triplejack Helper
 // @namespace    https://triplejack.com/
-// @version      0.5.8
+// @version      0.5.9
 // @description  Translates Triplejack public chat and direct messages using Google Translate requests.
 // @author       Rocco A.
 // @license      MIT
@@ -31,6 +31,7 @@
   const OUTGOING_ENABLED_STORAGE_KEY = "triplejack-helper-outgoing-enabled";
   const MESSAGE_TIMESTAMPS_STORAGE_KEY = "triplejack-helper-message-timestamps-enabled";
   const SESSION_SUMMARY_STORAGE_KEY = "triplejack-helper-session-summary-enabled";
+  const SESSION_HISTORY_STORAGE_KEY = "triplejack-helper-session-history";
   const PANEL_TOGGLE_KEY = "L";
   const LANGUAGE_PROMPT_KEY = "Y";
   const LANGUAGE_OPTIONS = [
@@ -1320,6 +1321,10 @@
     selfSeat: null,
     roomName: "",
     roomId: "",
+    roomType: "",
+    variantName: "",
+    variantType: "",
+    gameType: "",
     smallBlind: null,
     bigBlind: null,
     startStack: null,
@@ -1439,6 +1444,10 @@
       selfSeat: null,
       roomName: "",
       roomId: "",
+      roomType: "",
+      variantName: "",
+      variantType: "",
+      gameType: "",
       smallBlind: null,
       bigBlind: null,
       startStack: null,
@@ -1560,7 +1569,13 @@
     try {
       const roomInfo = JSON.parse(data.slice("poker_room_info:".length));
       sessionTracker.roomName = roomInfo.roomName || sessionTracker.roomName;
+      sessionTracker.variantName = roomInfo.variantName || sessionTracker.variantName;
+      sessionTracker.variantType = roomInfo.variantType || sessionTracker.variantType;
       const blindsField = roomInfo.infoFields?.find(([label]) => label === "Blinds");
+      const gameTypeField = roomInfo.infoFields?.find(([label]) => label === "Game Type");
+      if (gameTypeField?.[1]) {
+        sessionTracker.gameType = gameTypeField[1];
+      }
       if (blindsField) {
         const blindMatch = String(blindsField[1]).match(/\$?([\d,]+)\s*\/\s*\$?([\d,]+)/);
         if (blindMatch) {
@@ -1568,6 +1583,7 @@
           sessionTracker.bigBlind = Number(blindMatch[2].replace(/,/g, ""));
         }
       }
+      sessionTracker.roomType = getSessionRoomType();
     } catch {
       // Room info is optional; tuple-derived blinds still work without it.
     }
@@ -1579,6 +1595,10 @@
     }
 
     const summary = buildSessionSummary();
+    if (summary) {
+      persistSessionSummary(summary);
+      renderStatusPanel();
+    }
     resetSessionTracker();
 
     if (summary && getSessionSummaryEnabled()) {
@@ -1685,6 +1705,10 @@
 
     return {
       roomName: sessionTracker.roomName,
+      roomType: getSessionRoomType(),
+      variantName: sessionTracker.variantName,
+      variantType: sessionTracker.variantType,
+      gameType: sessionTracker.gameType,
       smallBlind: sessionTracker.smallBlind,
       bigBlind,
       startStack: sessionTracker.startStack,
@@ -1693,6 +1717,123 @@
       bigBlindDelta,
       bigBlindsPerHour,
       durationMs,
+      endedAt,
+    };
+  }
+
+  function getSessionRoomType() {
+    const roomKind =
+      sessionTracker.variantName || sessionTracker.variantType || sessionTracker.gameType || sessionTracker.roomName || "Unknown room";
+    const blinds = formatBlindLevel(sessionTracker.smallBlind, sessionTracker.bigBlind);
+    return blinds === "n/a" ? roomKind : `${roomKind} | ${blinds}`;
+  }
+
+  function persistSessionSummary(summary) {
+    const history = getSessionHistory();
+    history.push({
+      endedAt: summary.endedAt,
+      roomName: summary.roomName,
+      roomType: summary.roomType,
+      variantName: summary.variantName,
+      variantType: summary.variantType,
+      gameType: summary.gameType,
+      smallBlind: summary.smallBlind,
+      bigBlind: summary.bigBlind,
+      startStack: summary.startStack,
+      endStack: summary.endStack,
+      chipDelta: summary.chipDelta,
+      bigBlindDelta: summary.bigBlindDelta,
+      bigBlindsPerHour: summary.bigBlindsPerHour,
+      durationMs: summary.durationMs,
+    });
+
+    try {
+      localStorage.setItem(SESSION_HISTORY_STORAGE_KEY, JSON.stringify(history.slice(-500)));
+    } catch {
+      // Losing history should not block the per-session summary.
+    }
+  }
+
+  function getSessionHistory() {
+    try {
+      const parsedHistory = JSON.parse(localStorage.getItem(SESSION_HISTORY_STORAGE_KEY) || "[]");
+      return Array.isArray(parsedHistory) ? parsedHistory.filter(isValidSessionRecord) : [];
+    } catch {
+      return [];
+    }
+  }
+
+  function isValidSessionRecord(record) {
+    return (
+      record &&
+      Number.isFinite(record.endedAt) &&
+      Number.isFinite(record.durationMs) &&
+      Number.isFinite(record.bigBlindDelta)
+    );
+  }
+
+  function getSessionTrackingStats() {
+    const sessions = getSessionHistory();
+    const overall = aggregateSessionRecords(sessions);
+    const byRoomType = Array.from(groupSessionsByRoomType(sessions).entries())
+      .map(([roomType, records]) => {
+        return {
+          roomType,
+          ...aggregateSessionRecords(records),
+        };
+      })
+      .sort((a, b) => b.sessions - a.sessions || Math.abs(b.bigBlindsPerHour) - Math.abs(a.bigBlindsPerHour))
+      .slice(0, 4);
+    const recentSessions = sessions
+      .slice()
+      .sort((a, b) => b.endedAt - a.endedAt)
+      .slice(0, 5);
+    const recentTrend = aggregateSessionRecords(recentSessions);
+    const previousTrend = aggregateSessionRecords(
+      sessions
+        .slice()
+        .sort((a, b) => b.endedAt - a.endedAt)
+        .slice(5, 10),
+    );
+
+    return {
+      overall,
+      byRoomType,
+      recentSessions,
+      recentTrend,
+      previousTrend,
+    };
+  }
+
+  function groupSessionsByRoomType(sessions) {
+    const groups = new Map();
+    for (const session of sessions) {
+      const roomType = session.roomType || "Unknown room";
+      if (!groups.has(roomType)) {
+        groups.set(roomType, []);
+      }
+      groups.get(roomType).push(session);
+    }
+
+    return groups;
+  }
+
+  function aggregateSessionRecords(sessions) {
+    const totals = sessions.reduce(
+      (accumulator, session) => {
+        accumulator.sessions += 1;
+        accumulator.durationMs += Math.max(session.durationMs || 0, 0);
+        accumulator.bigBlindDelta += Number(session.bigBlindDelta) || 0;
+        accumulator.chipDelta += Number(session.chipDelta) || 0;
+        return accumulator;
+      },
+      { sessions: 0, durationMs: 0, bigBlindDelta: 0, chipDelta: 0 },
+    );
+
+    return {
+      ...totals,
+      bigBlindsPerHour:
+        totals.durationMs > 0 ? totals.bigBlindDelta / (totals.durationMs / 3600000) : null,
     };
   }
 
@@ -1947,6 +2088,7 @@
               <span>Summary on leave</span>
               <input data-tj-helper-session-summary-enabled type="checkbox" style="margin:0;" />
             </label>
+            <div data-tj-helper-session-tracking-stats style="margin-top:8px;color:#D6EEF5;"></div>
           </section>
           <div style="border-top:1px solid rgba(191,231,241,.22);padding-top:8px;">
             <div style="margin-bottom:6px;color:#E9F7FA;font-weight:700;">Status</div>
@@ -2020,6 +2162,7 @@
     const customOutgoingLanguageInput = statusPanel.querySelector("[data-tj-helper-custom-outgoing-language]");
     const messageTimestampsInput = statusPanel.querySelector("[data-tj-helper-message-timestamps-enabled]");
     const sessionSummaryInput = statusPanel.querySelector("[data-tj-helper-session-summary-enabled]");
+    const sessionTrackingStatsElement = statusPanel.querySelector("[data-tj-helper-session-tracking-stats]");
     const statsElement = statusPanel.querySelector("[data-tj-helper-stats]");
     const statusElement = statusPanel.querySelector("[data-tj-helper-status]");
 
@@ -2036,6 +2179,7 @@
     customOutgoingLanguageInput.value = outgoingTargetLanguage;
     messageTimestampsInput.checked = getMessageTimestampsEnabled();
     sessionSummaryInput.checked = getSessionSummaryEnabled();
+    sessionTrackingStatsElement.innerHTML = renderSessionTrackingStats();
     statsElement.textContent = `${state.hooked ? "hooked" : "not hooked"} | sockets ${state.sockets}, messages ${state.chatsSeen}, translations ${state.translationsShown}`;
     statusElement.textContent = state.lastStatus;
 
@@ -2045,6 +2189,92 @@
     }
 
     renderToolbarButtons();
+  }
+
+  function renderSessionTrackingStats() {
+    const trackingStats = getSessionTrackingStats();
+    if (!trackingStats.overall.sessions) {
+      return `<div style="color:#8FB8C4;">No tracked sessions yet.</div>`;
+    }
+
+    const roomRows = trackingStats.byRoomType
+      .map((roomStats) => {
+        return `
+          <div style="display:grid;grid-template-columns:minmax(0,1fr) auto;gap:6px;">
+            <span style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${escapePanelAttribute(roomStats.roomType)}">${escapePanelHtml(roomStats.roomType)}</span>
+            <strong style="color:${getSessionStatColor(roomStats.bigBlindDelta)};">${formatSessionStatSigned(roomStats.bigBlindsPerHour)}/h</strong>
+          </div>
+        `;
+      })
+      .join("");
+
+    const recentRows = trackingStats.recentSessions
+      .map((session) => {
+        return `
+          <div style="display:grid;grid-template-columns:76px minmax(0,1fr) auto;gap:6px;align-items:center;">
+            <span style="color:#8FB8C4;">${formatSessionDate(session.endedAt)}</span>
+            <span style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${escapePanelAttribute(session.roomType || "")}">${escapePanelHtml(session.roomType || "Unknown room")}</span>
+            <strong style="color:${getSessionStatColor(session.bigBlindDelta)};">${formatSessionStatSigned(session.bigBlindDelta)} BB</strong>
+          </div>
+        `;
+      })
+      .join("");
+
+    return `
+      <div style="margin-top:8px;border-top:1px solid rgba(191,231,241,.16);padding-top:8px;">
+        <div style="display:grid;grid-template-columns:1fr auto;gap:6px;margin-bottom:6px;">
+          <span style="color:#BFE7F1;">Overall</span>
+          <strong style="color:${getSessionStatColor(trackingStats.overall.bigBlindDelta)};">${formatSessionStatSigned(trackingStats.overall.bigBlindsPerHour)}/h</strong>
+          <span style="color:#8FB8C4;">${trackingStats.overall.sessions} sessions</span>
+          <span style="color:${getSessionStatColor(trackingStats.overall.bigBlindDelta)};">${formatSessionStatSigned(trackingStats.overall.bigBlindDelta)} BB</span>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr auto;gap:6px;margin-bottom:8px;">
+          <span style="color:#BFE7F1;">Recent 5</span>
+          <strong style="color:${getSessionStatColor(trackingStats.recentTrend.bigBlindDelta)};">${formatSessionStatSigned(trackingStats.recentTrend.bigBlindsPerHour)}/h</strong>
+          <span style="color:#8FB8C4;">Previous 5</span>
+          <span style="color:${getSessionStatColor(trackingStats.previousTrend.bigBlindDelta)};">${formatSessionStatSigned(trackingStats.previousTrend.bigBlindsPerHour)}/h</span>
+        </div>
+        <div style="margin-bottom:4px;color:#BFE7F1;">By room type</div>
+        <div style="display:grid;gap:4px;margin-bottom:8px;">${roomRows}</div>
+        <div style="margin-bottom:4px;color:#BFE7F1;">Recent sessions</div>
+        <div style="display:grid;gap:4px;">${recentRows}</div>
+      </div>
+    `;
+  }
+
+  function formatSessionStatSigned(value) {
+    if (value === null || value === undefined || !Number.isFinite(value)) {
+      return "n/a";
+    }
+
+    return `${value >= 0 ? "+" : ""}${value.toFixed(1)}`;
+  }
+
+  function getSessionStatColor(value) {
+    if (value === null || value === undefined || !Number.isFinite(value)) {
+      return "#8FB8C4";
+    }
+
+    return value >= 0 ? "#A7D8AD" : "#FFB0A8";
+  }
+
+  function formatSessionDate(timestamp) {
+    return new Date(timestamp).toLocaleDateString([], { month: "numeric", day: "numeric" }) +
+      " " +
+      new Date(timestamp).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+  }
+
+  function escapePanelHtml(value) {
+    return String(value)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#039;");
+  }
+
+  function escapePanelAttribute(value) {
+    return escapePanelHtml(value);
   }
 
   // Startup

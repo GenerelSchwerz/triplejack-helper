@@ -5,6 +5,10 @@
     selfSeat: null,
     roomName: "",
     roomId: "",
+    roomType: "",
+    variantName: "",
+    variantType: "",
+    gameType: "",
     smallBlind: null,
     bigBlind: null,
     startStack: null,
@@ -124,6 +128,10 @@
       selfSeat: null,
       roomName: "",
       roomId: "",
+      roomType: "",
+      variantName: "",
+      variantType: "",
+      gameType: "",
       smallBlind: null,
       bigBlind: null,
       startStack: null,
@@ -245,7 +253,13 @@
     try {
       const roomInfo = JSON.parse(data.slice("poker_room_info:".length));
       sessionTracker.roomName = roomInfo.roomName || sessionTracker.roomName;
+      sessionTracker.variantName = roomInfo.variantName || sessionTracker.variantName;
+      sessionTracker.variantType = roomInfo.variantType || sessionTracker.variantType;
       const blindsField = roomInfo.infoFields?.find(([label]) => label === "Blinds");
+      const gameTypeField = roomInfo.infoFields?.find(([label]) => label === "Game Type");
+      if (gameTypeField?.[1]) {
+        sessionTracker.gameType = gameTypeField[1];
+      }
       if (blindsField) {
         const blindMatch = String(blindsField[1]).match(/\$?([\d,]+)\s*\/\s*\$?([\d,]+)/);
         if (blindMatch) {
@@ -253,6 +267,7 @@
           sessionTracker.bigBlind = Number(blindMatch[2].replace(/,/g, ""));
         }
       }
+      sessionTracker.roomType = getSessionRoomType();
     } catch {
       // Room info is optional; tuple-derived blinds still work without it.
     }
@@ -264,6 +279,10 @@
     }
 
     const summary = buildSessionSummary();
+    if (summary) {
+      persistSessionSummary(summary);
+      renderStatusPanel();
+    }
     resetSessionTracker();
 
     if (summary && getSessionSummaryEnabled()) {
@@ -370,6 +389,10 @@
 
     return {
       roomName: sessionTracker.roomName,
+      roomType: getSessionRoomType(),
+      variantName: sessionTracker.variantName,
+      variantType: sessionTracker.variantType,
+      gameType: sessionTracker.gameType,
       smallBlind: sessionTracker.smallBlind,
       bigBlind,
       startStack: sessionTracker.startStack,
@@ -378,6 +401,123 @@
       bigBlindDelta,
       bigBlindsPerHour,
       durationMs,
+      endedAt,
+    };
+  }
+
+  function getSessionRoomType() {
+    const roomKind =
+      sessionTracker.variantName || sessionTracker.variantType || sessionTracker.gameType || sessionTracker.roomName || "Unknown room";
+    const blinds = formatBlindLevel(sessionTracker.smallBlind, sessionTracker.bigBlind);
+    return blinds === "n/a" ? roomKind : `${roomKind} | ${blinds}`;
+  }
+
+  function persistSessionSummary(summary) {
+    const history = getSessionHistory();
+    history.push({
+      endedAt: summary.endedAt,
+      roomName: summary.roomName,
+      roomType: summary.roomType,
+      variantName: summary.variantName,
+      variantType: summary.variantType,
+      gameType: summary.gameType,
+      smallBlind: summary.smallBlind,
+      bigBlind: summary.bigBlind,
+      startStack: summary.startStack,
+      endStack: summary.endStack,
+      chipDelta: summary.chipDelta,
+      bigBlindDelta: summary.bigBlindDelta,
+      bigBlindsPerHour: summary.bigBlindsPerHour,
+      durationMs: summary.durationMs,
+    });
+
+    try {
+      localStorage.setItem(SESSION_HISTORY_STORAGE_KEY, JSON.stringify(history.slice(-500)));
+    } catch {
+      // Losing history should not block the per-session summary.
+    }
+  }
+
+  function getSessionHistory() {
+    try {
+      const parsedHistory = JSON.parse(localStorage.getItem(SESSION_HISTORY_STORAGE_KEY) || "[]");
+      return Array.isArray(parsedHistory) ? parsedHistory.filter(isValidSessionRecord) : [];
+    } catch {
+      return [];
+    }
+  }
+
+  function isValidSessionRecord(record) {
+    return (
+      record &&
+      Number.isFinite(record.endedAt) &&
+      Number.isFinite(record.durationMs) &&
+      Number.isFinite(record.bigBlindDelta)
+    );
+  }
+
+  function getSessionTrackingStats() {
+    const sessions = getSessionHistory();
+    const overall = aggregateSessionRecords(sessions);
+    const byRoomType = Array.from(groupSessionsByRoomType(sessions).entries())
+      .map(([roomType, records]) => {
+        return {
+          roomType,
+          ...aggregateSessionRecords(records),
+        };
+      })
+      .sort((a, b) => b.sessions - a.sessions || Math.abs(b.bigBlindsPerHour) - Math.abs(a.bigBlindsPerHour))
+      .slice(0, 4);
+    const recentSessions = sessions
+      .slice()
+      .sort((a, b) => b.endedAt - a.endedAt)
+      .slice(0, 5);
+    const recentTrend = aggregateSessionRecords(recentSessions);
+    const previousTrend = aggregateSessionRecords(
+      sessions
+        .slice()
+        .sort((a, b) => b.endedAt - a.endedAt)
+        .slice(5, 10),
+    );
+
+    return {
+      overall,
+      byRoomType,
+      recentSessions,
+      recentTrend,
+      previousTrend,
+    };
+  }
+
+  function groupSessionsByRoomType(sessions) {
+    const groups = new Map();
+    for (const session of sessions) {
+      const roomType = session.roomType || "Unknown room";
+      if (!groups.has(roomType)) {
+        groups.set(roomType, []);
+      }
+      groups.get(roomType).push(session);
+    }
+
+    return groups;
+  }
+
+  function aggregateSessionRecords(sessions) {
+    const totals = sessions.reduce(
+      (accumulator, session) => {
+        accumulator.sessions += 1;
+        accumulator.durationMs += Math.max(session.durationMs || 0, 0);
+        accumulator.bigBlindDelta += Number(session.bigBlindDelta) || 0;
+        accumulator.chipDelta += Number(session.chipDelta) || 0;
+        return accumulator;
+      },
+      { sessions: 0, durationMs: 0, bigBlindDelta: 0, chipDelta: 0 },
+    );
+
+    return {
+      ...totals,
+      bigBlindsPerHour:
+        totals.durationMs > 0 ? totals.bigBlindDelta / (totals.durationMs / 3600000) : null,
     };
   }
 

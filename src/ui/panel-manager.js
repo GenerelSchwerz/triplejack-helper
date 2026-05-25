@@ -65,6 +65,7 @@
     const shellButton = helperShellNativeButton;
     state.activePanelId = "";
     renderHelperPanels({ preservePanelShell: false });
+    collapsePanelShellImmediately();
     if (shellButton?.isConnected) {
       dispatchNativePanelPointerDown(shellButton);
     }
@@ -558,12 +559,7 @@
       return;
     }
 
-    clearHelperPanelLayoutOverrides();
-    removeEmptyHelperPanelRegion();
-    deactivateHelperPanelSizingIfClosed();
-    syncHelperPanelResizeHandle();
-    resizeNativeStageToContainer();
-    window.dispatchEvent(new Event("resize"));
+    collapsePanelShellImmediately();
   }
 
   function prepareHelperPanelWidthBeforeOpen() {
@@ -638,10 +634,12 @@
 
   function scheduleHelperPanelCloseCleanup() {
     const cleanup = () => {
-      clearHelperPanelLayoutOverrides();
       if (!hasOpenPanel()) {
-        removeEmptyHelperPanelRegion();
+        collapsePanelShellImmediately();
+        return;
       }
+
+      clearHelperPanelLayoutOverrides();
       deactivateHelperPanelSizingIfClosed();
       resizeNativeStageToContainer();
       window.dispatchEvent(new Event("resize"));
@@ -649,6 +647,26 @@
 
     window.requestAnimationFrame(cleanup);
     window.setTimeout(cleanup, 120);
+  }
+
+  function collapsePanelShellImmediately() {
+    const panelContainer = document.querySelector('[data-testid="panel-container"]');
+    const panelRegion = panelContainer?.parentElement;
+    clearHelperPanelLayoutOverrides(panelContainer);
+    document.documentElement?.removeAttribute("data-tj-helper-panel-sizing-active");
+    document.documentElement?.style.removeProperty("--tj-helper-panel-width");
+
+    if (panelRegion) {
+      panelRegion.style.display = "none";
+      panelRegion.dataset.tjHelperHiddenEmpty = "1";
+    }
+    if (panelContainer) {
+      panelContainer.dataset.tjHelperHiddenEmpty = "1";
+    }
+
+    syncHelperPanelResizeHandle();
+    resizeNativeStageToContainer();
+    window.dispatchEvent(new Event("resize"));
   }
 
   function refreshNativeLayoutAfterPanelWidthChange() {
@@ -674,12 +692,7 @@
       const panelContainer = document.querySelector('[data-testid="panel-container"]');
       const activeNativePanelButton = getActiveNativePanelButton();
       if (!state.activePanelId && !activeNativePanelButton && !panelContainer?.dataset.tjHelperPanelContainer) {
-        clearHelperPanelLayoutOverrides(panelContainer);
-        removeEmptyHelperPanelRegion();
-        deactivateHelperPanelSizingIfClosed();
-        syncHelperPanelResizeHandle();
-        resizeNativeStageToContainer();
-        window.dispatchEvent(new Event("resize"));
+        collapsePanelShellImmediately();
         return;
       }
 
@@ -713,6 +726,16 @@
   function handleNativePanelButtonPointerDown(event) {
     const nativePanelButton = event.target?.closest?.('button[data-testid="panel button"]');
     if (!nativePanelButton || nativePanelButton.dataset.tjHelperToolbarButton) {
+      return;
+    }
+
+    if (!state.activePanelId && isNativePanelButtonActive(nativePanelButton)) {
+      collapsePanelShellImmediately();
+      window.setTimeout(() => {
+        deactivateHelperPanelSizingIfClosed();
+        resizeNativeStageToContainer();
+        window.dispatchEvent(new Event("resize"));
+      }, 0);
       return;
     }
 
@@ -753,6 +776,14 @@
   function getActiveNativePanelButton() {
     return document.querySelector(
       'button[data-testid="panel button"][data-is-active="true"]:not([data-tj-helper-toolbar-button])',
+    );
+  }
+
+  function isNativePanelButtonActive(nativePanelButton) {
+    return (
+      nativePanelButton?.getAttribute?.("data-is-active") === "true" ||
+      nativePanelButton?.dataset?.isActive === "true" ||
+      nativePanelButton?.title?.startsWith("Hide ")
     );
   }
 

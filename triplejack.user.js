@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Triplejack Helper
 // @namespace    https://triplejack.com/
-// @version      0.8.21
+// @version      0.8.22
 // @description  Adds Triplejack chat translation, message tools, and session tracking helpers.
 // @author       Rocco A.
 // @license      MIT
@@ -603,6 +603,7 @@
       socketId: "",
       ammoCostByItemKey: new Map(),
       inRoom: false,
+      selfPlayerId: "",
       players: [],
       selectedTarget: null,
       replayCount: 0,
@@ -831,31 +832,37 @@
         return;
       }
 
-      if (getPacketCommand(data) === "gamesdone") {
-        state.inRoom = false;
-        state.players = [];
-        state.selectedTarget = null;
-        if (state.active) {
-          stopSpam("quick bomb left room");
-          return;
-        }
+      const command = getPacketCommand(data);
+      if (command === "sit") {
+        updateRoomPlayersFromSit(data);
+        return;
+      }
 
-        setStatus("quick bomb left room");
+      if (command === "su") {
+        updateRoomPlayersFromStandUp(data);
+        return;
+      }
+
+      if (isLobbyReturnPacket(command, data)) {
+        leaveRoom();
       }
     }
 
     function updateRoomPlayersFromInitGame(data) {
+      const selfPayload = getCompoundSubframe(data, "self_data");
       const gamePayload = getCompoundSubframe(data, "init_game_data");
       if (!gamePayload) {
         return;
       }
 
+      const selfFields = splitProtocolFields(stripOuterBraces(selfPayload));
       const gameFields = splitProtocolFields(gamePayload);
       const players = splitProtocolFields(stripOuterBraces(gameFields[7] || ""))
         .map(parseRoomPlayerRow)
         .filter((player) => player.playerId && player.seat !== "" && Number(player.seat) >= 0);
 
       state.inRoom = true;
+      state.selfPlayerId = selfFields[1] || state.selfPlayerId;
       state.players = players;
       if (!players.some((player) => player.playerId === state.selectedTarget?.playerId)) {
         state.selectedTarget = null;
@@ -871,6 +878,77 @@
         playerName: decodeProtocolText(fields[3] || ""),
         seat: fields[8] || "",
       };
+    }
+
+    function updateRoomPlayersFromSit(data) {
+      const fields = splitProtocolFields(data.slice("sit:".length));
+      const playerId = fields[1] || "";
+      const seat = fields[2] || "";
+      if (!playerId || seat === "" || Number(seat) < 0) {
+        return;
+      }
+
+      state.inRoom = true;
+      upsertRoomPlayer({
+        playerId,
+        playerName: getKnownPlayerName(playerId) || `Player ${playerId}`,
+        seat,
+      });
+      setStatus(`quick bomb target joined seat ${seat}`);
+    }
+
+    function updateRoomPlayersFromStandUp(data) {
+      const fields = splitProtocolFields(data.slice("su:".length));
+      const playerId = fields[1] || "";
+      if (!playerId) {
+        return;
+      }
+
+      removeRoomPlayer(playerId);
+      setStatus(`quick bomb target left ${playerId}`);
+    }
+
+    function upsertRoomPlayer(player) {
+      const nextPlayers = state.players.filter((existingPlayer) => {
+        return existingPlayer.playerId !== player.playerId && existingPlayer.seat !== player.seat;
+      });
+      nextPlayers.push(player);
+      nextPlayers.sort((a, b) => Number(a.seat) - Number(b.seat));
+      state.players = nextPlayers;
+      if (state.selectedTarget?.playerId === player.playerId) {
+        state.selectedTarget = player;
+      }
+    }
+
+    function removeRoomPlayer(playerId) {
+      state.players = state.players.filter((player) => player.playerId !== playerId);
+      if (state.selectedTarget?.playerId === playerId) {
+        state.selectedTarget = null;
+        if (state.active) {
+          stopSpam("quick bomb target left");
+        }
+      }
+    }
+
+    function getKnownPlayerName(playerId) {
+      return state.players.find((player) => player.playerId === playerId)?.playerName || "";
+    }
+
+    function leaveRoom() {
+      state.inRoom = false;
+      state.selfPlayerId = "";
+      state.players = [];
+      state.selectedTarget = null;
+      if (state.active) {
+        stopSpam("quick bomb left room");
+        return;
+      }
+
+      setStatus("quick bomb left room");
+    }
+
+    function isLobbyReturnPacket(command, data) {
+      return command === "gamesdone" || data === "lounge:0" || command === "init_lobby";
     }
 
     function selectTarget(detail) {

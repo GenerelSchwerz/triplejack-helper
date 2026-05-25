@@ -1011,6 +1011,8 @@ Feature use:
 - Detect joins/leaves or new hand resets.
 - Feed player notes/tags with current stack and table position.
 
+For live room rosters, `update_players` is useful for stack and account state, but it does not carry seat numbers or player names. Seat membership changes are better tracked from `sit` and `su`, with the initial player id/name/seat map coming from `init_game_data`.
+
 ### `upd_player_bank`
 
 ```text
@@ -1083,6 +1085,33 @@ Feature use:
 
 - Leave/stand-up diagnostics.
 - Do not finalize the visible session summary on `su` alone; wait for `last_chip_stack` and the lobby `gamesdone:` marker.
+- Remove the player id from live target rosters. If the removed player was selected as a target, clear the selection.
+
+### `sit`
+
+```text
+sit:<unknown>,<playerId>,<seat>,<tableStack>,<bankChips>,...
+```
+
+Observed when a player sits down or buys in:
+
+```text
+sit:<unknown>,1595146,1,20000,95240639,...
+```
+
+Inferred fields:
+
+- First field is currently unknown.
+- Second field is player id.
+- Third field is seat number.
+- Fourth field is the player's current table stack after sitting.
+- Fifth field is bank/account chips.
+
+Feature use:
+
+- Add or move a player id in live target rosters.
+- Preserve the player name from `init_game_data` when known; `sit` itself has not been observed carrying the display name.
+- Pair with `su` and lobby-return frames (`lounge:0`, `init_lobby`, `gamesdone`) to keep room-only tools disabled outside rooms.
 
 ### `h`
 

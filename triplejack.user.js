@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Triplejack Helper
 // @namespace    https://triplejack.com/
-// @version      0.6.6
+// @version      0.6.7
 // @description  Translates Triplejack public chat and direct messages using Google Translate requests.
 // @author       Rocco A.
 // @license      MIT
@@ -1252,6 +1252,7 @@
     });
 
     document.addEventListener("DOMContentLoaded", renderToolbarButtons, { once: true });
+    document.addEventListener("click", handleHelperToolbarButtonClick, true);
     document.addEventListener("click", handleNativePanelButtonClick, true);
     window.addEventListener("load", renderToolbarButtons, { once: true });
 
@@ -1319,6 +1320,18 @@
     );
   }
 
+  function handleHelperToolbarButtonClick(event) {
+    const helperButton = event.target?.closest?.("[data-tj-helper-toolbar-button]");
+    if (!helperButton) {
+      return;
+    }
+
+    event.preventDefault();
+    event.stopPropagation();
+    event.stopImmediatePropagation?.();
+    toggleHelperPanel(helperButton.dataset.tjHelperToolbarButton);
+  }
+
   function getHelperToolbarItems() {
     return [
       {
@@ -1362,12 +1375,6 @@
         </div>
       </div>
     `;
-
-    helperButton.addEventListener("click", (event) => {
-      event.preventDefault();
-      event.stopPropagation();
-      toggleHelperPanel(item.id);
-    });
 
     return helperButton;
   }

@@ -9,6 +9,7 @@
     });
 
     document.addEventListener("DOMContentLoaded", renderToolbarButtons, { once: true });
+    document.addEventListener("click", handleHelperToolbarButtonClick, true);
     document.addEventListener("click", handleNativePanelButtonClick, true);
     window.addEventListener("load", renderToolbarButtons, { once: true });
 
@@ -76,6 +77,18 @@
     );
   }
 
+  function handleHelperToolbarButtonClick(event) {
+    const helperButton = event.target?.closest?.("[data-tj-helper-toolbar-button]");
+    if (!helperButton) {
+      return;
+    }
+
+    event.preventDefault();
+    event.stopPropagation();
+    event.stopImmediatePropagation?.();
+    toggleHelperPanel(helperButton.dataset.tjHelperToolbarButton);
+  }
+
   function getHelperToolbarItems() {
     return [
       {
@@ -119,12 +132,6 @@
         </div>
       </div>
     `;
-
-    helperButton.addEventListener("click", (event) => {
-      event.preventDefault();
-      event.stopPropagation();
-      toggleHelperPanel(item.id);
-    });
 
     return helperButton;
   }

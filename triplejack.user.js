@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Triplejack Helper
 // @namespace    https://triplejack.com/
-// @version      0.4.0
+// @version      0.4.1
 // @description  Translates Triplejack public chat and direct messages using Google Translate requests.
 // @author       Rocco A.
 // @license      MIT
@@ -897,11 +897,9 @@
   function getTimestampMessageElements() {
     const messageElements = new Set();
     const selectors = [
-      'aside[aria-label="chat panel"] .scaling-panel-contents',
       '[aria-label="chat messages"] .scaling-panel-contents',
-      '[data-testid="panel-container"] .scaling-panel-contents',
-      '[data-testid="panel-container"] font[color="#003366"]',
-      '[data-testid="panel-container"] font[color="#444444"]',
+      '[aria-label="chat messages"] font[color="#003366"]',
+      '[aria-label="chat messages"] font[color="#444444"]',
     ];
 
     for (const element of document.querySelectorAll(selectors.join(","))) {
@@ -916,6 +914,10 @@
 
   function isTimestampMessageElement(element) {
     if (!element || statusPanel?.contains(element)) {
+      return false;
+    }
+
+    if (!element.closest('[aria-label="chat messages"]')) {
       return false;
     }
 

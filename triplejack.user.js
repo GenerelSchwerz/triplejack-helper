@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Triplejack Helper
 // @namespace    https://triplejack.com/
-// @version      0.6.5
+// @version      0.6.6
 // @description  Translates Triplejack public chat and direct messages using Google Translate requests.
 // @author       Rocco A.
 // @license      MIT
@@ -924,6 +924,7 @@
   // Panel manager
   const SETTINGS_PANEL_ID = "settings";
   const SESSION_HISTORY_PANEL_ID = "session-history";
+  const NATIVE_PANEL_CLOSE_WAIT_MS = 1000;
   let isClosingNativePanelForHelper = false;
 
   function isHelperPanelActive(panelId) {
@@ -945,8 +946,9 @@
 
   function setActiveHelperPanel(panelId) {
     state.activePanelId = panelId;
-    if (panelId && closeActiveNativePanel()) {
-      window.setTimeout(renderHelperPanels, 0);
+    const closingNativeButton = panelId ? closeActiveNativePanel() : null;
+    if (closingNativeButton) {
+      renderHelperPanelsAfterNativeClose(closingNativeButton);
       return;
     }
 
@@ -1067,7 +1069,7 @@
       'button[data-testid="panel button"][data-is-active="true"]:not([data-tj-helper-toolbar-button])',
     );
     if (!activeNativeButton) {
-      return false;
+      return null;
     }
 
     isClosingNativePanelForHelper = true;
@@ -1076,7 +1078,24 @@
     } finally {
       isClosingNativePanelForHelper = false;
     }
-    return true;
+    return activeNativeButton;
+  }
+
+  function renderHelperPanelsAfterNativeClose(nativeButton) {
+    const startedAt = Date.now();
+
+    const renderWhenReady = () => {
+      if (state.activePanelId && nativeButton.isConnected && nativeButton.dataset.isActive === "true") {
+        if (Date.now() - startedAt < NATIVE_PANEL_CLOSE_WAIT_MS) {
+          window.requestAnimationFrame(renderWhenReady);
+          return;
+        }
+      }
+
+      renderHelperPanels();
+    };
+
+    window.requestAnimationFrame(renderWhenReady);
   }
 
   function handleNativePanelButtonClick(event) {

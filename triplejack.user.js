@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Triplejack Helper
 // @namespace    https://triplejack.com/
-// @version      0.3.1
+// @version      0.3.2
 // @description  Translates Triplejack public chat and direct messages using Google Translate requests.
 // @author       Rocco A.
 // @license      MIT
@@ -421,7 +421,12 @@
           return [];
         }
 
-        return payload.messages
+        const batch = {
+          payload,
+          remaining: 0,
+          translatedMessagesByIndex: new Map(),
+        };
+        const chatMessages = payload.messages
           .map((message) => {
             return parsePrivateChatMessage({
               ...message,
@@ -429,6 +434,17 @@
             });
           })
           .filter(Boolean);
+
+        batch.remaining = chatMessages.length;
+        for (const chatMessage of chatMessages) {
+          chatMessage.kind = "private message log";
+          chatMessage.privateLogBatch = batch;
+          chatMessage.privateLogMessageIndex = payload.messages.findIndex((message) => {
+            return message.id === chatMessage.privatePayload.messageId;
+          });
+        }
+
+        return chatMessages;
       }
 
       return [];
@@ -455,11 +471,12 @@
       const conversationPlayer = parsePlayerReference(payload.conversationPlayer);
       const fromPlayer = parsePlayerReference(payload.fromPlayer);
       const fromPlayerId = fromPlayer.playerId || String(payload.fromPlayerId ?? "");
-      if (!conversationPlayer.playerId || fromPlayerId !== conversationPlayer.playerId || payload.messageId === -1) {
+      const messageId = payload.messageId ?? payload.id;
+      if (!conversationPlayer.playerId || fromPlayerId !== conversationPlayer.playerId || messageId === -1) {
         return null;
       }
 
-      const messageKey = `${conversationPlayer.playerId}:${payload.messageId}:${payload.messageHtml}`;
+      const messageKey = `${conversationPlayer.playerId}:${messageId}:${payload.messageHtml}`;
       if (requestedPrivateMessageIds.has(messageKey)) {
         return null;
       }
@@ -480,7 +497,8 @@
         privatePayload: {
           conversationPlayer: payload.conversationPlayer,
           fromPlayer: payload.fromPlayer || payload.conversationPlayer,
-          messageId: payload.messageId,
+          fromPlayerId,
+          messageId,
           timestampSecs: payload.timestampSecs,
         },
       };
@@ -522,12 +540,17 @@
 
       pendingRequests.delete(detail.requestId);
 
+      const { socket, chatMessage } = pendingRequest;
+      if (chatMessage.privateLogBatch) {
+        handlePrivateLogTranslationResponse(socket, chatMessage, detail);
+        return;
+      }
+
       if (detail.error) {
         setStatus(`translation failed: ${detail.error}`);
         return;
       }
 
-      const { socket, chatMessage } = pendingRequest;
       if (!shouldShowTranslation(chatMessage.text, detail.translatedText)) {
         setStatus(`translation skipped: ${chatMessage.text}`);
         return;
@@ -541,6 +564,30 @@
       socket.dispatchEvent(new MessageEvent("message", { data: translatedData }));
       state.translationsShown += 1;
       setStatus(`translated ${chatMessage.playerName}: ${detail.translatedText}`);
+    }
+
+    function handlePrivateLogTranslationResponse(socket, chatMessage, detail) {
+      const batch = chatMessage.privateLogBatch;
+      batch.remaining -= 1;
+
+      if (detail.error) {
+        setStatus(`translation failed: ${detail.error}`);
+      } else if (shouldShowTranslation(chatMessage.text, detail.translatedText)) {
+        batch.translatedMessagesByIndex.set(
+          chatMessage.privateLogMessageIndex,
+          buildTranslatedPrivateLogMessage(chatMessage, detail.translatedText, detail.targetLanguage),
+        );
+        state.translationsShown += 1;
+        setStatus(`translated ${chatMessage.playerName}: ${detail.translatedText}`);
+      } else {
+        setStatus(`translation skipped: ${chatMessage.text}`);
+      }
+
+      if (batch.remaining > 0) {
+        return;
+      }
+
+      socket.dispatchEvent(new MessageEvent("message", { data: buildTranslatedPrivateLog(batch) }));
     }
 
     function buildTranslatedPlayerChatMessage(chatMessage, translatedText, targetLanguage) {
@@ -566,6 +613,35 @@
       };
 
       return `privatemsg:${JSON.stringify(translatedPayload)}`;
+    }
+
+    function buildTranslatedPrivateLogMessage(chatMessage, translatedText, targetLanguage) {
+      const sourcePayload = chatMessage.privatePayload;
+      const sourceMessageId = Number(sourcePayload.messageId);
+
+      return {
+        id: Number.isFinite(sourceMessageId) ? -Math.abs(sourceMessageId) : -Date.now(),
+        fromPlayerId: Number(sourcePayload.playerId || sourcePayload.fromPlayerId || chatMessage.playerId),
+        messageHtml: `<font ${TRANSLATED_MARKER}="1" color="#006B3F">[${targetLanguage}] ${escapeHtml(translatedText)}</font>`,
+        timestampSecs: sourcePayload.timestampSecs,
+      };
+    }
+
+    function buildTranslatedPrivateLog(batch) {
+      const translatedPayload = {
+        ...batch.payload,
+        messages: [],
+      };
+
+      batch.payload.messages.forEach((message, index) => {
+        translatedPayload.messages.push(message);
+        const translatedMessage = batch.translatedMessagesByIndex.get(index);
+        if (translatedMessage) {
+          translatedPayload.messages.push(translatedMessage);
+        }
+      });
+
+      return `privatemsg_log:${JSON.stringify(translatedPayload)}`;
     }
 
     function shouldShowTranslation(originalText, translatedText) {

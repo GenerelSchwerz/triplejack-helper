@@ -1,7 +1,7 @@
   const SETTINGS_PANEL_ID = "settings";
   const SESSION_HISTORY_PANEL_ID = "session-history";
-  const NATIVE_PANEL_CLOSE_WAIT_MS = 1000;
-  let isClosingNativePanelForHelper = false;
+  let nativePanelWrapperClassName = "";
+  let nativePanelAsideClassName = "";
 
   function isHelperPanelActive(panelId) {
     return state.activePanelId === panelId;
@@ -31,10 +31,8 @@
       previousPanelId: state.activePanelId,
     });
     state.activePanelId = panelId;
-    const closingNativeButton = panelId ? closeActiveNativePanel() : null;
-    if (closingNativeButton) {
-      renderHelperPanelsAfterNativeClose(closingNativeButton);
-      return;
+    if (panelId) {
+      deactivateNativePanelsForHelper();
     }
 
     renderHelperPanels();
@@ -49,6 +47,7 @@
     if (!state.activePanelId) {
       removeHelperPanelHost();
     } else {
+      deactivateNativePanelsForHelper();
       getHelperPanelMount();
     }
 
@@ -87,8 +86,8 @@
     const nativeAside = panelContainer.querySelector("aside.scaling-panel-container");
     const wrapper = document.createElement("div");
     wrapper.dataset.tjHelperPanelWrapper = "1";
-    if (nativeWrapper?.className) {
-      wrapper.className = nativeWrapper.className;
+    if (nativeWrapper?.className || nativePanelWrapperClassName) {
+      wrapper.className = nativeWrapper?.className || nativePanelWrapperClassName;
     }
     wrapper.style.cssText = [
       "height:100%",
@@ -98,7 +97,7 @@
     ].join(";");
 
     const aside = document.createElement("aside");
-    aside.className = nativeAside?.className || "scaling-panel-container";
+    aside.className = nativeAside?.className || nativePanelAsideClassName || "scaling-panel-container";
     aside.dataset.tjHelperPanelHost = "1";
     aside.setAttribute("aria-label", "Triplejack Helper panel");
     aside.style.cssText = [
@@ -120,8 +119,8 @@
     helperPanelHost = aside;
     logPanelDebug("helper-panel-mount-created", {
       activePanelId: state.activePanelId,
-      usedNativeWrapperClass: Boolean(nativeWrapper?.className),
-      usedNativeAsideClass: Boolean(nativeAside?.className),
+      usedNativeWrapperClass: Boolean(nativeWrapper?.className || nativePanelWrapperClassName),
+      usedNativeAsideClass: Boolean(nativeAside?.className || nativePanelAsideClassName),
     });
     return helperPanelHost;
   }
@@ -169,68 +168,58 @@
     return panelContainer;
   }
 
-  function closeActiveNativePanel() {
-    const activeNativeButton = document.querySelector(
+  function deactivateNativePanelsForHelper() {
+    const activeNativeButtons = document.querySelectorAll(
       'button[data-testid="panel button"][data-is-active="true"]:not([data-tj-helper-toolbar-button])',
     );
-    if (!activeNativeButton) {
-      logPanelDebug("close-active-native-panel-none", {
-        activePanelId: state.activePanelId,
-      });
-      return null;
-    }
 
-    logPanelDebug("close-active-native-panel-click", {
-      activePanelId: state.activePanelId,
-      title: activeNativeButton.title || "",
-      ariaLabel: activeNativeButton.getAttribute("aria-label") || "",
-    });
-    isClosingNativePanelForHelper = true;
-    try {
-      activeNativeButton.click();
-    } finally {
-      isClosingNativePanelForHelper = false;
-    }
-    return activeNativeButton;
-  }
-
-  function renderHelperPanelsAfterNativeClose(nativeButton) {
-    const startedAt = Date.now();
-    let loggedWaiting = false;
-
-    const renderWhenReady = () => {
-      if (state.activePanelId && nativeButton.isConnected && nativeButton.dataset.isActive === "true") {
-        if (Date.now() - startedAt < NATIVE_PANEL_CLOSE_WAIT_MS) {
-          if (!loggedWaiting) {
-            loggedWaiting = true;
-            logPanelDebug("waiting-for-native-panel-close", {
-              activePanelId: state.activePanelId,
-              title: nativeButton.title || "",
-              ariaLabel: nativeButton.getAttribute("aria-label") || "",
-            });
-          }
-          window.requestAnimationFrame(renderWhenReady);
-          return;
-        }
+    for (const nativeButton of activeNativeButtons) {
+      const toolbar = nativeButton.parentElement;
+      const inactiveNativeButton = toolbar?.querySelector(
+        'button[data-testid="panel button"]:not([data-is-active="true"]):not([data-tj-helper-toolbar-button])',
+      );
+      if (inactiveNativeButton?.className) {
+        nativeButton.className = inactiveNativeButton.className;
       }
 
-      logPanelDebug("native-panel-close-wait-complete", {
-        activePanelId: state.activePanelId,
-        nativeButtonStillActive: nativeButton.dataset.isActive === "true",
-        elapsedMs: Date.now() - startedAt,
-      });
-      renderHelperPanels();
-    };
+      delete nativeButton.dataset.isActive;
+      if (nativeButton.title?.startsWith("Hide ")) {
+        nativeButton.title = nativeButton.title.replace(/^Hide /, "Show ");
+      }
+    }
 
-    window.requestAnimationFrame(renderWhenReady);
+    const panelContainer = getNativePanelContainer();
+    let removedNativePanelCount = 0;
+    if (panelContainer) {
+      const nativeWrapper = panelContainer.querySelector(":scope > div:not([data-tj-helper-panel-wrapper])");
+      const nativeAside = panelContainer.querySelector("aside.scaling-panel-container");
+      if (nativeWrapper?.className) {
+        nativePanelWrapperClassName = nativeWrapper.className;
+      }
+      if (nativeAside?.className) {
+        nativePanelAsideClassName = nativeAside.className;
+      }
+
+      for (const child of [...panelContainer.children]) {
+        if (child.matches("[data-tj-helper-panel-wrapper]")) {
+          continue;
+        }
+
+        child.remove();
+        removedNativePanelCount += 1;
+      }
+    }
+
+    if (activeNativeButtons.length || removedNativePanelCount) {
+      logPanelDebug("native-panels-deactivated-for-helper", {
+        activePanelId: state.activePanelId,
+        deactivatedButtonCount: activeNativeButtons.length,
+        removedNativePanelCount,
+      });
+    }
   }
 
   function handleNativePanelButtonClick(event) {
-    if (isClosingNativePanelForHelper) {
-      logPanelDebug("native-panel-click-ignored-during-helper-close", {});
-      return;
-    }
-
     const nativePanelButton = event.target?.closest?.('button[data-testid="panel button"]');
     if (!nativePanelButton || nativePanelButton.dataset.tjHelperToolbarButton) {
       return;

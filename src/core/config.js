@@ -48,5 +48,5 @@
   let timestampRenderQueued = false;
 
   function logPanelDebug(action, details = {}) {
-    console.log(PANEL_DEBUG_LOG_PREFIX, action, details);
+    console.debug(PANEL_DEBUG_LOG_PREFIX, action, details);
   }

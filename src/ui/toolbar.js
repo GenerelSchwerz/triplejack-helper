@@ -27,6 +27,10 @@
   function renderToolbarButtons() {
     let insertedCount = 0;
 
+    if (state.activePanelId) {
+      deactivateNativePanelsForHelper();
+    }
+
     for (const toolbar of findPanelToolbars()) {
       if (!toolbar) {
         continue;

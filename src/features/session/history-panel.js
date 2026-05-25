@@ -151,8 +151,8 @@
             ${renderHistoryChartModeButton("cumulativeBigBlinds", "Cumulative BB")}
           </div>
         </div>
-        <div style="position:relative;height:230px;width:100%;min-width:0;">
-          <canvas data-tj-session-history-chart aria-label="Session history graph for selected range" role="img"></canvas>
+        <div style="position:relative;height:250px;width:100%;min-width:0;overflow:hidden;">
+          <canvas data-tj-session-history-chart aria-label="Session history graph for selected range" role="img" style="display:block;width:100%;height:100%;box-sizing:border-box;"></canvas>
           <div data-tj-session-history-chart-fallback style="display:none;color:#8FB8C4;padding:10px;border:1px solid rgba(191,231,241,.16);border-radius:6px;background:rgba(8,17,23,.25);">
             Chart.js did not load, so the history graph cannot be rendered.
           </div>
@@ -176,6 +176,9 @@
       }
       return;
     }
+    chartElement.style.display = "block";
+    chartElement.style.width = "100%";
+    chartElement.style.height = "100%";
 
     let cumulativeBigBlinds = 0;
     const chronologicalSessions = (report.sessions || []).slice().sort((a, b) => a.endedAt - b.endedAt);
@@ -251,10 +254,10 @@
         maintainAspectRatio: false,
         layout: {
           padding: {
-            top: 12,
-            right: 8,
-            bottom: 0,
-            left: 0,
+            top: 18,
+            right: 12,
+            bottom: 6,
+            left: 4,
           },
         },
         interaction: {
@@ -295,6 +298,7 @@
               maxRotation: 0,
               autoSkip: true,
               maxTicksLimit: Math.min(6, Math.max(chartPoints.length, 2)),
+              padding: 6,
             },
             grid: {
               color: "rgba(191,231,241,.08)",
@@ -304,8 +308,13 @@
             beginAtZero: true,
             min: -yLimit,
             max: yLimit,
+            afterFit(scale) {
+              scale.width = Math.max(scale.width, 46);
+            },
             ticks: {
               color: "#8FB8C4",
+              maxTicksLimit: 5,
+              padding: 6,
               callback(value) {
                 return formatHistoryChartAxisValue(value);
               },
@@ -321,6 +330,14 @@
           },
         },
       },
+    });
+    scheduleSessionHistoryChartResize();
+  }
+
+  function scheduleSessionHistoryChartResize() {
+    window.requestAnimationFrame(() => {
+      sessionHistoryChart?.resize?.();
+      sessionHistoryChart?.update?.("none");
     });
   }
 

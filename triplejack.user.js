@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Triplejack Helper
 // @namespace    https://triplejack.com/
-// @version      0.8.10
+// @version      0.8.11
 // @description  Adds Triplejack chat translation, message tools, and session tracking helpers.
 // @author       Rocco A.
 // @license      MIT
@@ -2792,6 +2792,8 @@
             ${renderHistoryChartModeButton("bbPerHour", "BB/hour")}
             ${renderHistoryChartModeButton("netBigBlinds", "Net BB")}
             ${renderHistoryChartModeButton("cumulativeBigBlinds", "Cumulative BB")}
+            ${renderHistoryChartModeButton("cumulativeChips", "Cumulative chips")}
+            ${renderHistoryChartModeButton("cumulativeBigBlindsPerHour", "Cumulative BB/hour")}
           </div>
         </div>
         <div style="position:relative;height:250px;width:100%;min-width:0;overflow:hidden;">
@@ -2824,9 +2826,13 @@
     chartElement.style.height = "100%";
 
     let cumulativeBigBlinds = 0;
+    let cumulativeChips = 0;
+    let cumulativeDurationMs = 0;
     const chronologicalSessions = (report.sessions || []).slice().sort((a, b) => a.endedAt - b.endedAt);
     const chartPoints = chronologicalSessions.map((session, index) => {
       cumulativeBigBlinds += Number(session.bigBlindDelta) || 0;
+      cumulativeChips += Number(session.chipDelta) || 0;
+      cumulativeDurationMs += Math.max(0, Number(session.durationMs) || 0);
       return {
         label: formatHistoryChartPointLabel(session, chronologicalSessions[index - 1]),
         tooltipLabel: formatHistoryDateTime(session.endedAt),
@@ -2834,6 +2840,8 @@
         netBigBlinds: Number(session.bigBlindDelta) || 0,
         bbPerHour: getSessionBigBlindsPerHour(session),
         cumulativeBigBlinds,
+        cumulativeChips,
+        cumulativeBigBlindsPerHour: getCumulativeBigBlindsPerHour(cumulativeBigBlinds, cumulativeDurationMs),
       };
     });
     const chartMode = getSessionHistoryChartModeConfig();
@@ -2972,7 +2980,7 @@
               maxTicksLimit: 5,
               padding: 6,
               callback(value) {
-                return formatHistoryChartAxisValue(value);
+                return formatHistoryChartAxisValue(value, chartMode);
               },
             },
             grid: {
@@ -3031,6 +3039,7 @@
         label: "Net BB",
         axisLabel: "Net BB",
         suffix: " BB",
+        decimals: 1,
         color: "#6EA8FE",
         fillColor: "rgba(110,168,254,.16)",
         positiveColor: "#6EA8FE",
@@ -3045,9 +3054,41 @@
         label: "Cumulative BB",
         axisLabel: "Cumulative BB",
         suffix: " BB",
+        decimals: 1,
         color: "#F6C85F",
         fillColor: "rgba(246,200,95,.16)",
         positiveColor: "#F6C85F",
+        negativeColor: "#FF8D7A",
+      };
+    }
+
+    if (sessionHistoryChartMode === "cumulativeChips") {
+      return {
+        valueKey: "cumulativeChips",
+        title: "Results (cumulative chips)",
+        label: "Cumulative chips",
+        axisLabel: "Chips",
+        suffix: " chips",
+        decimals: 0,
+        compactAxis: true,
+        color: "#C9A7FF",
+        fillColor: "rgba(201,167,255,.14)",
+        positiveColor: "#C9A7FF",
+        negativeColor: "#FF8D7A",
+      };
+    }
+
+    if (sessionHistoryChartMode === "cumulativeBigBlindsPerHour") {
+      return {
+        valueKey: "cumulativeBigBlindsPerHour",
+        title: "Results (cumulative big blinds per hour)",
+        label: "Cumulative BB/hour",
+        axisLabel: "Cumulative BB/hour",
+        suffix: " BB/h",
+        decimals: 1,
+        color: "#9AD8FF",
+        fillColor: "rgba(154,216,255,.14)",
+        positiveColor: "#9AD8FF",
         negativeColor: "#FF8D7A",
       };
     }
@@ -3058,6 +3099,7 @@
       label: "BB/hour",
       axisLabel: "BB/hour",
       suffix: " BB/h",
+      decimals: 1,
       color: "#7ED6C4",
       fillColor: "rgba(126,214,196,.14)",
       positiveColor: "#7ED6C4",
@@ -3076,44 +3118,32 @@
 
   function renderHistoryPeriodRow(period) {
     return `
-      <div style="${getHistoryCompactRowStyle()}">
-        <div style="${getHistoryRowPrimaryLineStyle()}">
-          <span style="${getHistoryRowLabelStyle()}">${escapeHistoryHtml(period.periodLabel)}</span>
-          <span style="${getHistoryRowMutedValueStyle()}">${period.sessions} ses</span>
-        </div>
-        <div style="${getHistoryRowMetricLineStyle()}">
-          <strong style="${getHistoryRowMetricStyle(getHistoryStatColor(period.bigBlindDelta))}">${formatHistorySigned(period.bigBlindDelta)} BB</strong>
-          <span style="${getHistoryRowMetricStyle(getHistoryStatColor(period.bigBlindDelta))}">${formatHistorySigned(period.bigBlindsPerHour)}/h</span>
-        </div>
+      <div style="${getHistoryPeriodRowStyle()}">
+        <span style="${getHistoryRowLabelStyle()}">${escapeHistoryHtml(period.periodLabel)}</span>
+        <span style="${getHistoryRowMutedValueStyle()}">${period.sessions} ses</span>
+        <strong style="${getHistoryRowMetricStyle(getHistoryStatColor(period.bigBlindDelta))}">${formatHistorySigned(period.bigBlindDelta)} BB</strong>
+        <span style="${getHistoryRowMetricStyle(getHistoryStatColor(period.bigBlindDelta))}">${formatHistorySigned(period.bigBlindsPerHour)}/h</span>
       </div>
     `;
   }
 
   function renderHistoryRoomRow(roomStats) {
     return `
-      <div style="${getHistoryCompactRowStyle()}">
-        <div style="${getHistoryRowPrimaryLineStyle()}">
-          <span style="${getHistoryRowLabelStyle()}" title="${escapeHistoryAttribute(roomStats.roomType)}">${escapeHistoryHtml(roomStats.roomType)}</span>
-          <span style="${getHistoryRowMutedValueStyle()}">${roomStats.sessions} ses</span>
-        </div>
-        <div style="${getHistoryRowMetricLineStyle()}">
-          <strong style="${getHistoryRowMetricStyle(getHistoryStatColor(roomStats.bigBlindDelta))}">${formatHistorySigned(roomStats.bigBlindsPerHour)}/h</strong>
-        </div>
+      <div style="${getHistoryRoomRowStyle()}">
+        <span style="${getHistoryRowLabelStyle()}" title="${escapeHistoryAttribute(roomStats.roomType)}">${escapeHistoryHtml(roomStats.roomType)}</span>
+        <span style="${getHistoryRowMutedValueStyle()}">${roomStats.sessions} ses</span>
+        <strong style="${getHistoryRowMetricStyle(getHistoryStatColor(roomStats.bigBlindDelta))}">${formatHistorySigned(roomStats.bigBlindsPerHour)}/h</strong>
       </div>
     `;
   }
 
   function renderHistorySessionRow(session) {
     return `
-      <div style="${getHistoryCompactRowStyle()}border-top:1px solid rgba(191,231,241,.1);padding-top:4px;">
-        <div style="${getHistoryRowPrimaryLineStyle()}">
-          <span style="${getHistoryRowLabelStyle()}color:#8FB8C4;">${escapeHistoryHtml(formatHistoryDateTime(session.endedAt))}</span>
-          <span style="${getHistoryRowMutedValueStyle()}">${formatHistoryDuration(session.durationMs)}</span>
-        </div>
-        <div style="${getHistoryRowMetricLineStyle()}">
-          <strong style="${getHistoryRowMetricStyle(getHistoryStatColor(session.bigBlindDelta))}">${formatHistorySigned(session.bigBlindDelta)} BB</strong>
-          <span style="${getHistoryRowMetricStyle(getHistoryStatColor(session.bigBlindDelta))}">${formatHistorySigned(session.bigBlindsPerHour)}/h</span>
-        </div>
+      <div style="${getHistorySessionRowStyle()}">
+        <span style="${getHistoryRowLabelStyle()}color:#8FB8C4;">${escapeHistoryHtml(formatHistoryDateTime(session.endedAt))}</span>
+        <strong style="${getHistoryRowMetricStyle(getHistoryStatColor(session.bigBlindDelta))}">${formatHistorySigned(session.bigBlindDelta)} BB</strong>
+        <span style="${getHistoryRowMetricStyle(getHistoryStatColor(session.bigBlindDelta))}">${formatHistorySigned(session.bigBlindsPerHour)}/h</span>
+        <span style="${getHistoryRowMutedValueStyle()}">${formatHistoryDuration(session.durationMs)}</span>
       </div>
     `;
   }
@@ -3155,16 +3185,16 @@
     return "margin-bottom:6px;color:#BFE7F1;font-weight:700;";
   }
 
-  function getHistoryCompactRowStyle() {
-    return "display:grid;gap:3px;min-width:0;";
+  function getHistoryPeriodRowStyle() {
+    return "display:grid;grid-template-columns:minmax(0,1fr) minmax(34px,auto) minmax(60px,auto) minmax(58px,auto);gap:6px;align-items:center;min-width:0;";
   }
 
-  function getHistoryRowPrimaryLineStyle() {
-    return "display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:baseline;min-width:0;";
+  function getHistoryRoomRowStyle() {
+    return "display:grid;grid-template-columns:minmax(0,1fr) minmax(34px,auto) minmax(62px,auto);gap:6px;align-items:center;min-width:0;";
   }
 
-  function getHistoryRowMetricLineStyle() {
-    return "display:flex;justify-content:flex-end;gap:14px;align-items:baseline;min-width:0;flex-wrap:wrap;text-align:right;";
+  function getHistorySessionRowStyle() {
+    return "display:grid;grid-template-columns:minmax(92px,1fr) minmax(66px,auto) minmax(66px,auto) minmax(50px,auto);gap:8px;border-top:1px solid rgba(191,231,241,.1);padding-top:4px;align-items:center;min-width:0;";
   }
 
   function getHistoryRowLabelStyle() {
@@ -3172,11 +3202,11 @@
   }
 
   function getHistoryRowMutedValueStyle() {
-    return "color:#8FB8C4;white-space:nowrap;";
+    return "color:#8FB8C4;white-space:nowrap;text-align:right;";
   }
 
   function getHistoryRowMetricStyle(color) {
-    return `color:${color};white-space:nowrap;`;
+    return `color:${color};white-space:nowrap;text-align:right;`;
   }
 
   function formatHistorySigned(value) {
@@ -3202,17 +3232,23 @@
       return "n/a";
     }
 
-    return `${number >= 0 ? "+" : ""}${number.toFixed(1)}${chartMode.suffix}`;
+    const decimals = Number.isInteger(chartMode.decimals) ? chartMode.decimals : 1;
+    const formatted = decimals === 0 ? formatHistoryInteger(number) : number.toFixed(decimals);
+    return `${number >= 0 ? "+" : ""}${formatted}${chartMode.suffix}`;
   }
 
-  function formatHistoryChartAxisValue(value) {
+  function formatHistoryChartAxisValue(value, chartMode = {}) {
     const number = Number(value);
     if (!Number.isFinite(number)) {
       return "0";
     }
 
-    if (Math.abs(number) >= 1000) {
-      return `${Math.round(number / 100) / 10}k`;
+    if (chartMode.compactAxis || Math.abs(number) >= 1000) {
+      return formatHistoryCompactNumber(number);
+    }
+
+    if (Number.isInteger(chartMode.decimals) && chartMode.decimals === 0) {
+      return formatHistoryInteger(number);
     }
 
     if (Math.abs(number) >= 100) {
@@ -3220,6 +3256,19 @@
     }
 
     return number.toFixed(1);
+  }
+
+  function formatHistoryCompactNumber(value) {
+    const number = Number(value);
+    if (Math.abs(number) >= 1000) {
+      return `${Math.round(number / 100) / 10}k`;
+    }
+
+    return formatHistoryInteger(number);
+  }
+
+  function formatHistoryInteger(value) {
+    return String(Math.round(Number(value))).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
   }
 
   function getFiniteHistoryChartValue(value) {
@@ -3263,6 +3312,14 @@
     }
 
     return bigBlindDelta / (durationMs / 3600000);
+  }
+
+  function getCumulativeBigBlindsPerHour(cumulativeBigBlinds, cumulativeDurationMs) {
+    if (!Number.isFinite(cumulativeBigBlinds) || !Number.isFinite(cumulativeDurationMs) || cumulativeDurationMs <= 0) {
+      return null;
+    }
+
+    return cumulativeBigBlinds / (cumulativeDurationMs / 3600000);
   }
 
   function getHistoryChartYAxisLimit(values) {

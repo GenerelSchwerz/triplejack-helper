@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Triplejack Helper
 // @namespace    https://triplejack.com/
-// @version      0.4.3
+// @version      0.4.4
 // @description  Translates Triplejack public chat and direct messages using Google Translate requests.
 // @author       Rocco A.
 // @license      MIT
@@ -23,6 +23,7 @@
 (function () {
   "use strict";
 
+  // Configuration
   const SCRIPT_NAME = "Triplejack Helper";
   const DEFAULT_TARGET_LANGUAGE = "en";
   const LANGUAGE_STORAGE_KEY = "triplejack-helper-target-language";
@@ -63,6 +64,7 @@
   let timestampObserver;
   let timestampRenderQueued = false;
 
+  // Userscript bridge
   function log(...args) {
     console.log(`[${SCRIPT_NAME}]`, ...args);
   }
@@ -173,6 +175,7 @@
     setStatus("page-context WebSocket hook injected");
   }
 
+  // Page WebSocket hook
   function pageWebSocketHook(config) {
     const TRANSLATED_MARKER = "data-tj-translated";
     const NativeWebSocket = window.WebSocket;
@@ -669,6 +672,7 @@
     install();
   }
 
+  // Translation service
   function translateText(text, targetLanguage) {
     const trimmedText = text.trim();
     const cacheKey = `${targetLanguage}:${trimmedText}`;
@@ -715,6 +719,7 @@
     });
   }
 
+  // Settings
   function getTargetLanguage() {
     return localStorage.getItem(LANGUAGE_STORAGE_KEY) || DEFAULT_TARGET_LANGUAGE;
   }
@@ -816,6 +821,7 @@
     });
   }
 
+  // Toolbar
   function installToolbarButton() {
     const observer = new MutationObserver(() => {
       renderToolbarButtons();
@@ -834,6 +840,106 @@
     }
   }
 
+  function renderToolbarButtons() {
+    for (const toolbar of findPanelToolbars()) {
+      if (!toolbar || toolbar.querySelector("[data-tj-helper-toolbar-button]")) {
+        continue;
+      }
+
+      const insertTarget = getToolbarInsertTarget(toolbar);
+      if (!insertTarget) {
+        continue;
+      }
+
+      const helperButton = buildToolbarButton(toolbar, insertTarget);
+      toolbar.insertBefore(helperButton, insertTarget);
+    }
+
+    for (const helperButton of document.querySelectorAll("[data-tj-helper-toolbar-button]")) {
+      if (state.panelVisible) {
+        helperButton.className = helperButton.dataset.tjHelperActiveClass || helperButton.className;
+        helperButton.dataset.isActive = "true";
+      } else {
+        helperButton.className = helperButton.dataset.tjHelperInactiveClass || helperButton.className;
+        delete helperButton.dataset.isActive;
+      }
+    }
+  }
+
+  function findPanelToolbars() {
+    const toolbars = new Set();
+    const panelButtons = document.querySelectorAll('button[data-testid="panel button"]');
+
+    for (const panelButton of panelButtons) {
+      const toolbar = panelButton.parentElement;
+      if (toolbar?.querySelector('[aria-label="Chat"],[aria-label="Direct Messages"]')) {
+        toolbars.add(toolbar);
+      }
+    }
+
+    return toolbars;
+  }
+
+  function getToolbarInsertTarget(toolbar) {
+    return (
+      toolbar.querySelector(
+        [
+          'button[aria-label="Chat"][data-testid="panel button"]',
+          'button[title="Chat"][data-testid="panel button"]',
+          'button[title="Show Chat"][data-testid="panel button"]',
+          'button[title="Hide Chat"][data-testid="panel button"]',
+        ].join(","),
+      ) || toolbar.querySelector('button[data-testid="panel button"]')
+    );
+  }
+
+  function buildToolbarButton(toolbar, insertTarget) {
+    const referenceButton =
+      toolbar.querySelector('button[data-testid="panel button"]:not([data-is-active="true"])') || insertTarget;
+    const outerClassName = referenceButton.firstElementChild?.className || "";
+    const iconWrapperClassName =
+      referenceButton.querySelector('[data-testid="icon-scale-wrapper"]')?.className || "";
+    const helperButton = document.createElement("button");
+    const activeButton = toolbar.querySelector('button[data-testid="panel button"][data-is-active="true"]');
+
+    helperButton.type = "button";
+    helperButton.title = "Translate Settings";
+    helperButton.className = referenceButton.className;
+    helperButton.style.background = "transparent";
+    helperButton.style.paddingLeft = "5px";
+    helperButton.style.paddingRight = "5px";
+    helperButton.dataset.tjHelperInactiveClass = referenceButton.className;
+    helperButton.dataset.tjHelperActiveClass =
+      activeButton?.className || insertTarget.className || referenceButton.className;
+    helperButton.dataset.tjHelperToolbarButton = "1";
+    helperButton.setAttribute("data-testid", "panel button");
+    helperButton.setAttribute("aria-label", "Translate Settings");
+    helperButton.innerHTML = `
+      <div class="${escapeAttribute(outerClassName)}">
+        <div data-testid="icon-scale-wrapper" class="${escapeAttribute(iconWrapperClassName)}">
+          <span style="font:700 23px/1 Arial,sans-serif;color:currentColor;">T</span>
+        </div>
+      </div>
+    `;
+
+    helperButton.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      toggleStatusPanel();
+    });
+
+    return helperButton;
+  }
+
+  function escapeAttribute(value) {
+    return String(value)
+      .replace(/&/g, "&amp;")
+      .replace(/"/g, "&quot;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;");
+  }
+
+  // Message timestamps
   function installMessageTimestamps() {
     timestampObserver = new MutationObserver(queueMessageTimestampRender);
     timestampObserver.observe(document.documentElement, {
@@ -975,105 +1081,7 @@
     });
   }
 
-  function renderToolbarButtons() {
-    for (const toolbar of findPanelToolbars()) {
-      if (!toolbar || toolbar.querySelector("[data-tj-helper-toolbar-button]")) {
-        continue;
-      }
-
-      const insertTarget = getToolbarInsertTarget(toolbar);
-      if (!insertTarget) {
-        continue;
-      }
-
-      const helperButton = buildToolbarButton(toolbar, insertTarget);
-      toolbar.insertBefore(helperButton, insertTarget);
-    }
-
-    for (const helperButton of document.querySelectorAll("[data-tj-helper-toolbar-button]")) {
-      if (state.panelVisible) {
-        helperButton.className = helperButton.dataset.tjHelperActiveClass || helperButton.className;
-        helperButton.dataset.isActive = "true";
-      } else {
-        helperButton.className = helperButton.dataset.tjHelperInactiveClass || helperButton.className;
-        delete helperButton.dataset.isActive;
-      }
-    }
-  }
-
-  function findPanelToolbars() {
-    const toolbars = new Set();
-    const panelButtons = document.querySelectorAll('button[data-testid="panel button"]');
-
-    for (const panelButton of panelButtons) {
-      const toolbar = panelButton.parentElement;
-      if (toolbar?.querySelector('[aria-label="Chat"],[aria-label="Direct Messages"]')) {
-        toolbars.add(toolbar);
-      }
-    }
-
-    return toolbars;
-  }
-
-  function getToolbarInsertTarget(toolbar) {
-    return (
-      toolbar.querySelector(
-        [
-          'button[aria-label="Chat"][data-testid="panel button"]',
-          'button[title="Chat"][data-testid="panel button"]',
-          'button[title="Show Chat"][data-testid="panel button"]',
-          'button[title="Hide Chat"][data-testid="panel button"]',
-        ].join(","),
-      ) || toolbar.querySelector('button[data-testid="panel button"]')
-    );
-  }
-
-  function buildToolbarButton(toolbar, insertTarget) {
-    const referenceButton =
-      toolbar.querySelector('button[data-testid="panel button"]:not([data-is-active="true"])') || insertTarget;
-    const outerClassName = referenceButton.firstElementChild?.className || "";
-    const iconWrapperClassName =
-      referenceButton.querySelector('[data-testid="icon-scale-wrapper"]')?.className || "";
-    const helperButton = document.createElement("button");
-    const activeButton = toolbar.querySelector('button[data-testid="panel button"][data-is-active="true"]');
-
-    helperButton.type = "button";
-    helperButton.title = "Translate Settings";
-    helperButton.className = referenceButton.className;
-    helperButton.style.background = "transparent";
-    helperButton.style.paddingLeft = "5px";
-    helperButton.style.paddingRight = "5px";
-    helperButton.dataset.tjHelperInactiveClass = referenceButton.className;
-    helperButton.dataset.tjHelperActiveClass =
-      activeButton?.className || insertTarget.className || referenceButton.className;
-    helperButton.dataset.tjHelperToolbarButton = "1";
-    helperButton.setAttribute("data-testid", "panel button");
-    helperButton.setAttribute("aria-label", "Translate Settings");
-    helperButton.innerHTML = `
-      <div class="${escapeAttribute(outerClassName)}">
-        <div data-testid="icon-scale-wrapper" class="${escapeAttribute(iconWrapperClassName)}">
-          <span style="font:700 23px/1 Arial,sans-serif;color:currentColor;">T</span>
-        </div>
-      </div>
-    `;
-
-    helperButton.addEventListener("click", (event) => {
-      event.preventDefault();
-      event.stopPropagation();
-      toggleStatusPanel();
-    });
-
-    return helperButton;
-  }
-
-  function escapeAttribute(value) {
-    return String(value)
-      .replace(/&/g, "&amp;")
-      .replace(/"/g, "&quot;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;");
-  }
-
+  // Settings panel
   function renderStatusPanel() {
     if (!document.documentElement) {
       return;
@@ -1221,6 +1229,7 @@
     renderToolbarButtons();
   }
 
+  // Startup
   function main() {
     GM_registerMenuCommand("Show Triplejack Helper status", () => {
       state.panelVisible = true;
@@ -1239,4 +1248,5 @@
   }
 
   main();
+
 })();

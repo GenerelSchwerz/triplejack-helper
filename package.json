@@ -1,0 +1,6 @@
+{
+  "scripts": {
+    "build": "node scripts/build-userscript.js",
+    "check": "npm run build && node --check triplejack.user.js"
+  }
+}

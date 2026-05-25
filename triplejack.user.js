@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Triplejack Helper
 // @namespace    https://triplejack.com/
-// @version      0.6.11
+// @version      0.6.12
 // @description  Translates Triplejack public chat and direct messages using Google Translate requests.
 // @author       Rocco A.
 // @license      MIT
@@ -1056,11 +1056,13 @@
     return helperPanelHost;
   }
 
-  function removeHelperPanelHost() {
+  function removeHelperPanelHost(options = {}) {
     const hostRoot = helperPanelHost?.closest?.("[data-tj-helper-panel-wrapper]") || helperPanelHost;
     hostRoot?.remove();
     helperPanelHost = null;
-    removeEmptyHelperPanelRegion();
+    if (!options.preservePanelShell) {
+      removeEmptyHelperPanelRegion();
+    }
   }
 
   function removeEmptyHelperPanelRegion() {
@@ -1194,8 +1196,8 @@
       ariaLabel: nativePanelButton.getAttribute("aria-label") || "",
     });
     state.activePanelId = "";
-    removeHelperPanelHost();
     showNativePanelContainer(document.querySelector('[data-testid="panel-container"]'));
+    removeHelperPanelHost({ preservePanelShell: true });
     renderToolbarButtons();
     for (const helperButton of document.querySelectorAll("[data-tj-helper-toolbar-button]")) {
       helperButton.blur();
@@ -1921,7 +1923,6 @@
     sessionHistoryPanel.innerHTML = `
       <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:12px;">
         <strong style="font-size:15px;">Session History</strong>
-        <button type="button" data-tj-session-history-close style="border:0;background:#294655;color:#fff;border-radius:4px;padding:3px 8px;cursor:pointer;">x</button>
       </div>
       <div style="${getHistoryControlGridStyle()}">
         <label style="display:grid;gap:3px;color:#BFE7F1;">Start
@@ -1945,9 +1946,7 @@
       <div data-tj-session-history-body></div>
     `;
 
-    const closeButton = sessionHistoryPanel.querySelector("[data-tj-session-history-close]");
     const roomSelect = sessionHistoryPanel.querySelector("[data-tj-session-history-room]");
-    closeButton.addEventListener("click", closeHelperPanels);
 
     roomSelect.appendChild(new Option("All room types", ""));
     for (const roomType of getSessionHistoryRoomTypes()) {
@@ -2757,7 +2756,6 @@
       statusPanel.innerHTML = `
         <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:10px;">
           <strong style="font-size:13px;">Triplejack Helper</strong>
-          <button type="button" data-tj-helper-close style="border:0;background:#294655;color:#fff;border-radius:4px;padding:2px 7px;cursor:pointer;">x</button>
         </div>
         <div style="display:grid;gap:10px;">
           <section style="border:1px solid rgba(191,231,241,.2);border-radius:6px;padding:10px;background:rgba(255,255,255,.025);">
@@ -2799,7 +2797,6 @@
         </div>
       `;
 
-      const closeButton = statusPanel.querySelector("[data-tj-helper-close]");
       const languageSelect = statusPanel.querySelector("[data-tj-helper-language]");
       const customLanguageInput = statusPanel.querySelector("[data-tj-helper-custom-language]");
       const outgoingEnabledInput = statusPanel.querySelector("[data-tj-helper-outgoing-enabled]");
@@ -2819,10 +2816,6 @@
         outgoingOption.textContent = label;
         outgoingLanguageSelect.appendChild(outgoingOption);
       }
-
-      closeButton.addEventListener("click", () => {
-        closeHelperPanels();
-      });
 
       languageSelect.addEventListener("change", () => {
         setTargetLanguage(languageSelect.value);

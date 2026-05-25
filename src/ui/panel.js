@@ -28,7 +28,6 @@
       statusPanel.innerHTML = `
         <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:10px;">
           <strong style="font-size:13px;">Triplejack Helper</strong>
-          <button type="button" data-tj-helper-close style="border:0;background:#294655;color:#fff;border-radius:4px;padding:2px 7px;cursor:pointer;">x</button>
         </div>
         <div style="display:grid;gap:10px;">
           <section style="border:1px solid rgba(191,231,241,.2);border-radius:6px;padding:10px;background:rgba(255,255,255,.025);">
@@ -70,7 +69,6 @@
         </div>
       `;
 
-      const closeButton = statusPanel.querySelector("[data-tj-helper-close]");
       const languageSelect = statusPanel.querySelector("[data-tj-helper-language]");
       const customLanguageInput = statusPanel.querySelector("[data-tj-helper-custom-language]");
       const outgoingEnabledInput = statusPanel.querySelector("[data-tj-helper-outgoing-enabled]");
@@ -90,10 +88,6 @@
         outgoingOption.textContent = label;
         outgoingLanguageSelect.appendChild(outgoingOption);
       }
-
-      closeButton.addEventListener("click", () => {
-        closeHelperPanels();
-      });
 
       languageSelect.addEventListener("change", () => {
         setTargetLanguage(languageSelect.value);

@@ -127,11 +127,13 @@
     return helperPanelHost;
   }
 
-  function removeHelperPanelHost() {
+  function removeHelperPanelHost(options = {}) {
     const hostRoot = helperPanelHost?.closest?.("[data-tj-helper-panel-wrapper]") || helperPanelHost;
     hostRoot?.remove();
     helperPanelHost = null;
-    removeEmptyHelperPanelRegion();
+    if (!options.preservePanelShell) {
+      removeEmptyHelperPanelRegion();
+    }
   }
 
   function removeEmptyHelperPanelRegion() {
@@ -265,8 +267,8 @@
       ariaLabel: nativePanelButton.getAttribute("aria-label") || "",
     });
     state.activePanelId = "";
-    removeHelperPanelHost();
     showNativePanelContainer(document.querySelector('[data-testid="panel-container"]'));
+    removeHelperPanelHost({ preservePanelShell: true });
     renderToolbarButtons();
     for (const helperButton of document.querySelectorAll("[data-tj-helper-toolbar-button]")) {
       helperButton.blur();

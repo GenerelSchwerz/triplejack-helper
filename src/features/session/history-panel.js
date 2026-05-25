@@ -38,7 +38,6 @@
     sessionHistoryPanel.innerHTML = `
       <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:12px;">
         <strong style="font-size:15px;">Session History</strong>
-        <button type="button" data-tj-session-history-close style="border:0;background:#294655;color:#fff;border-radius:4px;padding:3px 8px;cursor:pointer;">x</button>
       </div>
       <div style="${getHistoryControlGridStyle()}">
         <label style="display:grid;gap:3px;color:#BFE7F1;">Start
@@ -62,9 +61,7 @@
       <div data-tj-session-history-body></div>
     `;
 
-    const closeButton = sessionHistoryPanel.querySelector("[data-tj-session-history-close]");
     const roomSelect = sessionHistoryPanel.querySelector("[data-tj-session-history-room]");
-    closeButton.addEventListener("click", closeHelperPanels);
 
     roomSelect.appendChild(new Option("All room types", ""));
     for (const roomType of getSessionHistoryRoomTypes()) {

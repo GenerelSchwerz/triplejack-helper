@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Triplejack Helper
 // @namespace    https://triplejack.com/
-// @version      0.4.1
+// @version      0.4.2
 // @description  Translates Triplejack public chat and direct messages using Google Translate requests.
 // @author       Rocco A.
 // @license      MIT
@@ -873,6 +873,12 @@
       return;
     }
 
+    for (const timestampElement of document.querySelectorAll("[data-tj-helper-timestamp]")) {
+      if (!isTimestampMessageElement(timestampElement.parentElement)) {
+        timestampElement.remove();
+      }
+    }
+
     for (const messageElement of getTimestampMessageElements()) {
       if (messageElement.querySelector("[data-tj-helper-timestamp]")) {
         continue;
@@ -925,11 +931,24 @@
       return false;
     }
 
+    if (element.matches("[data-testid='message input'],.MuiTextField-root,.MuiFormControl-root")) {
+      return false;
+    }
+
+    if (element.closest("[data-testid='message input'],.MuiTextField-root,.MuiFormControl-root")) {
+      return false;
+    }
+
+    if (element.querySelector("textarea,input,button,[title='Send Chat']")) {
+      return false;
+    }
+
     if (element.matches("button,input,select,textarea")) {
       return false;
     }
 
-    return Boolean(element.textContent?.trim());
+    const messageText = element.textContent?.replace(/\d{1,2}:\d{2}\s*(AM|PM)?/gi, "").trim();
+    return Boolean(messageText);
   }
 
   function getMessageTimestamp(messageElement) {

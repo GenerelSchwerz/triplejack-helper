@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Triplejack Helper
 // @namespace    https://triplejack.com/
-// @version      0.6.10
+// @version      0.6.11
 // @description  Translates Triplejack public chat and direct messages using Google Translate requests.
 // @author       Rocco A.
 // @license      MIT
@@ -1019,10 +1019,12 @@
       wrapper.className = nativeWrapper?.className || nativePanelWrapperClassName;
     }
     wrapper.style.cssText = [
+      "width:100%",
       "height:100%",
       "min-width:0",
       "display:flex",
       "align-items:stretch",
+      "flex:1 1 auto",
     ].join(";");
 
     const aside = document.createElement("aside");
@@ -1030,10 +1032,10 @@
     aside.dataset.tjHelperPanelHost = "1";
     aside.setAttribute("aria-label", "Triplejack Helper panel");
     aside.style.cssText = [
-      `width:${HELPER_PANEL_WIDTH}px`,
-      `max-width:min(${HELPER_PANEL_WIDTH}px,calc(100vw - 64px))`,
+      "width:100%",
       "height:100%",
       "min-width:0",
+      "flex:1 1 auto",
       "box-sizing:border-box",
       "overflow:hidden",
       "display:flex",
@@ -1058,11 +1060,38 @@
     const hostRoot = helperPanelHost?.closest?.("[data-tj-helper-panel-wrapper]") || helperPanelHost;
     hostRoot?.remove();
     helperPanelHost = null;
+    removeEmptyHelperPanelRegion();
+  }
+
+  function removeEmptyHelperPanelRegion() {
+    const panelContainer = document.querySelector('[data-testid="panel-container"]');
+    if (!panelContainer || panelContainer.children.length) {
+      return;
+    }
+
+    const panelRegion = panelContainer.parentElement;
+    if (panelContainer.dataset.tjHelperPanelContainer || panelRegion?.dataset.tjHelperPanelRegion) {
+      panelRegion?.remove();
+      return;
+    }
+
+    panelContainer.style.display = "none";
+    panelContainer.dataset.tjHelperHiddenEmpty = "1";
+  }
+
+  function showNativePanelContainer(panelContainer) {
+    if (!panelContainer?.dataset.tjHelperHiddenEmpty) {
+      return;
+    }
+
+    panelContainer.style.display = "";
+    delete panelContainer.dataset.tjHelperHiddenEmpty;
   }
 
   function getNativePanelContainer() {
     const existingPanelContainer = document.querySelector('[data-testid="panel-container"]');
     if (existingPanelContainer) {
+      showNativePanelContainer(existingPanelContainer);
       return existingPanelContainer;
     }
 
@@ -1079,7 +1108,8 @@
       "min-width:0",
       "display:flex",
       "align-items:stretch",
-      "flex:0 0 auto",
+      `flex:0 1 ${HELPER_PANEL_WIDTH}px`,
+      `max-width:min(${HELPER_PANEL_WIDTH}px,calc(100vw - 64px))`,
     ].join(";");
 
     const panelContainer = document.createElement("div");
@@ -1165,7 +1195,11 @@
     });
     state.activePanelId = "";
     removeHelperPanelHost();
+    showNativePanelContainer(document.querySelector('[data-testid="panel-container"]'));
     renderToolbarButtons();
+    for (const helperButton of document.querySelectorAll("[data-tj-helper-toolbar-button]")) {
+      helperButton.blur();
+    }
   }
 
   function getActiveHelperPanelElement() {
@@ -1353,6 +1387,7 @@
       } else {
         helperButton.className = helperButton.dataset.tjHelperInactiveClass || helperButton.className;
         delete helperButton.dataset.isActive;
+        helperButton.removeAttribute("data-is-active");
       }
     }
 
@@ -1876,6 +1911,7 @@
       "height:100%",
       "box-sizing:border-box",
       "overflow:auto",
+      "overflow-x:hidden",
       "padding:14px",
       "color:#F5FAFC",
       "font:12px/1.35 Arial,sans-serif",
@@ -1980,7 +2016,7 @@
 
   function renderHistoryPeriodRow(period) {
     return `
-      <div style="display:grid;grid-template-columns:minmax(0,1fr) 64px 72px 64px;gap:8px;">
+      <div style="display:grid;grid-template-columns:minmax(110px,1fr) repeat(3,minmax(56px,auto));gap:8px;align-items:center;">
         <span>${escapeHistoryHtml(period.periodLabel)}</span>
         <span style="color:#8FB8C4;">${period.sessions} ses</span>
         <strong style="color:${getHistoryStatColor(period.bigBlindDelta)};">${formatHistorySigned(period.bigBlindDelta)} BB</strong>
@@ -1991,7 +2027,7 @@
 
   function renderHistoryRoomRow(roomStats) {
     return `
-      <div style="display:grid;grid-template-columns:minmax(0,1fr) 64px 72px;gap:8px;">
+      <div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(48px,auto) minmax(62px,auto);gap:8px;align-items:center;">
         <span style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${escapeHistoryAttribute(roomStats.roomType)}">${escapeHistoryHtml(roomStats.roomType)}</span>
         <span style="color:#8FB8C4;">${roomStats.sessions} ses</span>
         <strong style="color:${getHistoryStatColor(roomStats.bigBlindDelta)};">${formatHistorySigned(roomStats.bigBlindsPerHour)}/h</strong>
@@ -2001,9 +2037,8 @@
 
   function renderHistorySessionRow(session) {
     return `
-      <div style="display:grid;grid-template-columns:120px minmax(0,1fr) 72px 72px 72px;gap:8px;border-top:1px solid rgba(191,231,241,.1);padding-top:4px;">
+      <div style="display:grid;grid-template-columns:minmax(88px,1fr) repeat(3,minmax(58px,auto));gap:8px;border-top:1px solid rgba(191,231,241,.1);padding-top:4px;align-items:center;">
         <span style="color:#8FB8C4;">${escapeHistoryHtml(formatHistoryDateTime(session.endedAt))}</span>
-        <span style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${escapeHistoryAttribute(session.roomType || "")}">${escapeHistoryHtml(session.roomType || "Unknown room")}</span>
         <strong style="color:${getHistoryStatColor(session.bigBlindDelta)};">${formatHistorySigned(session.bigBlindDelta)} BB</strong>
         <span style="color:${getHistoryStatColor(session.bigBlindDelta)};">${formatHistorySigned(session.bigBlindsPerHour)}/h</span>
         <span style="color:#8FB8C4;">${formatHistoryDuration(session.durationMs)}</span>

@@ -90,10 +90,12 @@
       wrapper.className = nativeWrapper?.className || nativePanelWrapperClassName;
     }
     wrapper.style.cssText = [
+      "width:100%",
       "height:100%",
       "min-width:0",
       "display:flex",
       "align-items:stretch",
+      "flex:1 1 auto",
     ].join(";");
 
     const aside = document.createElement("aside");
@@ -101,10 +103,10 @@
     aside.dataset.tjHelperPanelHost = "1";
     aside.setAttribute("aria-label", "Triplejack Helper panel");
     aside.style.cssText = [
-      `width:${HELPER_PANEL_WIDTH}px`,
-      `max-width:min(${HELPER_PANEL_WIDTH}px,calc(100vw - 64px))`,
+      "width:100%",
       "height:100%",
       "min-width:0",
+      "flex:1 1 auto",
       "box-sizing:border-box",
       "overflow:hidden",
       "display:flex",
@@ -129,11 +131,38 @@
     const hostRoot = helperPanelHost?.closest?.("[data-tj-helper-panel-wrapper]") || helperPanelHost;
     hostRoot?.remove();
     helperPanelHost = null;
+    removeEmptyHelperPanelRegion();
+  }
+
+  function removeEmptyHelperPanelRegion() {
+    const panelContainer = document.querySelector('[data-testid="panel-container"]');
+    if (!panelContainer || panelContainer.children.length) {
+      return;
+    }
+
+    const panelRegion = panelContainer.parentElement;
+    if (panelContainer.dataset.tjHelperPanelContainer || panelRegion?.dataset.tjHelperPanelRegion) {
+      panelRegion?.remove();
+      return;
+    }
+
+    panelContainer.style.display = "none";
+    panelContainer.dataset.tjHelperHiddenEmpty = "1";
+  }
+
+  function showNativePanelContainer(panelContainer) {
+    if (!panelContainer?.dataset.tjHelperHiddenEmpty) {
+      return;
+    }
+
+    panelContainer.style.display = "";
+    delete panelContainer.dataset.tjHelperHiddenEmpty;
   }
 
   function getNativePanelContainer() {
     const existingPanelContainer = document.querySelector('[data-testid="panel-container"]');
     if (existingPanelContainer) {
+      showNativePanelContainer(existingPanelContainer);
       return existingPanelContainer;
     }
 
@@ -150,7 +179,8 @@
       "min-width:0",
       "display:flex",
       "align-items:stretch",
-      "flex:0 0 auto",
+      `flex:0 1 ${HELPER_PANEL_WIDTH}px`,
+      `max-width:min(${HELPER_PANEL_WIDTH}px,calc(100vw - 64px))`,
     ].join(";");
 
     const panelContainer = document.createElement("div");
@@ -236,7 +266,11 @@
     });
     state.activePanelId = "";
     removeHelperPanelHost();
+    showNativePanelContainer(document.querySelector('[data-testid="panel-container"]'));
     renderToolbarButtons();
+    for (const helperButton of document.querySelectorAll("[data-tj-helper-toolbar-button]")) {
+      helperButton.blur();
+    }
   }
 
   function getActiveHelperPanelElement() {

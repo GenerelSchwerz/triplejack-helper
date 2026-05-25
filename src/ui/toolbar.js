@@ -59,6 +59,7 @@
       } else {
         helperButton.className = helperButton.dataset.tjHelperInactiveClass || helperButton.className;
         delete helperButton.dataset.isActive;
+        helperButton.removeAttribute("data-is-active");
       }
     }
 

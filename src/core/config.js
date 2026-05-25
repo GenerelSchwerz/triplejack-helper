@@ -55,6 +55,7 @@
     lastStatus: "starting",
     activePanelId: "",
     quickBombLastItem: "",
+    quickBombHasTemplate: false,
     quickBombAmmoCost: 1,
     quickBombInRoom: false,
     quickBombPlayers: [],

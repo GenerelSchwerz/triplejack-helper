@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Triplejack Helper
 // @namespace    https://triplejack.com/
-// @version      0.8.25
+// @version      0.8.26
 // @description  Adds Triplejack chat translation, message tools, and session tracking helpers.
 // @author       Rocco A.
 // @license      MIT
@@ -82,6 +82,7 @@
     lastStatus: "starting",
     activePanelId: "",
     quickBombLastItem: "",
+    quickBombHasTemplate: false,
     quickBombAmmoCost: 1,
     quickBombInRoom: false,
     quickBombPlayers: [],
@@ -669,7 +670,7 @@
 
       state.lastPacket = data;
       state.lastItemKey = itemKey;
-      setStatus(`quick bomb saved ${itemKey}`);
+      setStatus(`quick bomb saved ${itemKey} template`);
     }
 
     function handleKeyDown(event) {
@@ -721,7 +722,11 @@
       }
 
       if (!state.lastPacket || typeof state.nativeSend !== "function") {
-        setStatus("quick bomb has no saved bomb");
+        setStatus(
+          state.lastPacket
+            ? "quick bomb needs an outgoing bomb send first"
+            : "quick bomb needs an incoming newbomb template",
+        );
         return;
       }
 
@@ -1196,6 +1201,7 @@
         new CustomEvent(config.statusEvent, {
           detail: {
             quickBombLastItem: state.lastItemKey,
+            quickBombHasTemplate: Boolean(state.lastPacket),
             quickBombReplayCount: state.replayCount,
             quickBombSocketId: state.socketId,
             quickBombLastReplayAt: state.lastReplayAt,
@@ -5175,7 +5181,7 @@
     startButton.style.opacity = startButton.disabled ? ".5" : "1";
     stopButton.style.opacity = stopButton.disabled ? ".5" : "1";
     statusElement.textContent = state.quickBombLastItem
-      ? `Saved: ${state.quickBombLastItem} | cost ${state.quickBombAmmoCost || 1} | sent ${state.quickBombReplayCount || 0}${
+      ? `${state.quickBombHasTemplate ? "Saved" : "Waiting"}: ${state.quickBombLastItem} | cost ${state.quickBombAmmoCost || 1} | sent ${state.quickBombReplayCount || 0}${
           state.quickBombActive ? ` | remaining ${state.quickBombRemaining || 0}` : ""
         }`
       : "No bomb saved yet.";

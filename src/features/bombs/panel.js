@@ -143,7 +143,7 @@
     startButton.style.opacity = startButton.disabled ? ".5" : "1";
     stopButton.style.opacity = stopButton.disabled ? ".5" : "1";
     statusElement.textContent = state.quickBombLastItem
-      ? `Saved: ${state.quickBombLastItem} | cost ${state.quickBombAmmoCost || 1} | sent ${state.quickBombReplayCount || 0}${
+      ? `${state.quickBombHasTemplate ? "Saved" : "Waiting"}: ${state.quickBombLastItem} | cost ${state.quickBombAmmoCost || 1} | sent ${state.quickBombReplayCount || 0}${
           state.quickBombActive ? ` | remaining ${state.quickBombRemaining || 0}` : ""
         }`
       : "No bomb saved yet.";

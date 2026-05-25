@@ -1,7 +1,7 @@
 ﻿// ==UserScript==
 // @name         Triplejack Helper
 // @namespace    https://triplejack.com/
-// @version      0.8.25
+// @version      0.8.26
 // @description  Adds Triplejack chat translation, message tools, and session tracking helpers.
 // @author       Rocco A.
 // @license      MIT

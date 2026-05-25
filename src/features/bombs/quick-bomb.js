@@ -72,7 +72,7 @@
 
       state.lastPacket = data;
       state.lastItemKey = itemKey;
-      setStatus(`quick bomb saved ${itemKey}`);
+      setStatus(`quick bomb saved ${itemKey} template`);
     }
 
     function handleKeyDown(event) {
@@ -124,7 +124,11 @@
       }
 
       if (!state.lastPacket || typeof state.nativeSend !== "function") {
-        setStatus("quick bomb has no saved bomb");
+        setStatus(
+          state.lastPacket
+            ? "quick bomb needs an outgoing bomb send first"
+            : "quick bomb needs an incoming newbomb template",
+        );
         return;
       }
 
@@ -599,6 +603,7 @@
         new CustomEvent(config.statusEvent, {
           detail: {
             quickBombLastItem: state.lastItemKey,
+            quickBombHasTemplate: Boolean(state.lastPacket),
             quickBombReplayCount: state.replayCount,
             quickBombSocketId: state.socketId,
             quickBombLastReplayAt: state.lastReplayAt,

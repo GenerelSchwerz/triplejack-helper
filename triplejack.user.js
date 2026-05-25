@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Triplejack Helper
 // @namespace    https://triplejack.com/
-// @version      0.8.0
+// @version      0.8.1
 // @description  Adds Triplejack chat translation, message tools, and session tracking helpers.
 // @author       Rocco A.
 // @license      MIT
@@ -1236,20 +1236,27 @@
       "left:0",
       "top:0",
       "height:100%",
-      "width:24px",
+      "width:14px",
       "z-index:20",
       "cursor:col-resize",
       "touch-action:none",
       "background:transparent",
       "display:flex",
       "align-items:center",
-      "justify-content:center",
+      "justify-content:flex-end",
     ].join(";");
     resizeHandle.innerHTML = `
-      <div aria-hidden="true" style="width:14px;height:62px;border:1px solid rgba(137,198,215,.72);border-right-color:rgba(137,198,215,.42);border-radius:7px 0 0 7px;background:rgba(18,31,39,.98);box-shadow:0 0 0 1px rgba(3,10,14,.65),0 4px 14px rgba(0,0,0,.36);display:flex;align-items:center;justify-content:center;">
-        <div style="width:5px;height:34px;border-left:1px solid rgba(191,231,241,.62);border-right:1px solid rgba(191,231,241,.34);"></div>
-      </div>
+      <div data-tj-helper-panel-resize-indicator aria-hidden="true" style="width:2px;height:100%;background:rgba(126,214,196,.28);box-shadow:0 0 0 1px rgba(3,10,14,.12);opacity:.42;transition:opacity .12s ease,background .12s ease;"></div>
     `;
+    const indicator = resizeHandle.querySelector("[data-tj-helper-panel-resize-indicator]");
+    resizeHandle.addEventListener("pointerenter", () => {
+      indicator.style.opacity = ".95";
+      indicator.style.background = "rgba(126,214,196,.85)";
+    });
+    resizeHandle.addEventListener("pointerleave", () => {
+      indicator.style.opacity = ".42";
+      indicator.style.background = "rgba(126,214,196,.28)";
+    });
     resizeHandle.addEventListener("pointerdown", handleHelperPanelResizePointerDown);
     return resizeHandle;
   }
@@ -1696,9 +1703,9 @@
     }
 
     const panelRect = panelRegion.getBoundingClientRect();
-    resizeHandle.style.left = `${Math.round(panelRect.left - 14)}px`;
+    resizeHandle.style.left = `${Math.round(panelRect.left - 12)}px`;
     resizeHandle.style.top = `${Math.round(panelRect.top)}px`;
-    resizeHandle.style.height = `${Math.round(stageHeight || panelRect.height || 0)}px`;
+    resizeHandle.style.height = `${Math.round(panelRect.height || stageHeight || 0)}px`;
   }
 
   function getNativeStageHeight() {

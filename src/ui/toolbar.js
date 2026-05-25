@@ -80,12 +80,12 @@
       {
         id: SETTINGS_PANEL_ID,
         title: "Triplejack Helper Settings",
-        label: "T",
+        label: "⚙",
       },
       {
         id: SESSION_HISTORY_PANEL_ID,
         title: "Session History",
-        label: "BB",
+        label: "📈",
       },
     ];
   }
@@ -114,7 +114,7 @@
     helperButton.innerHTML = `
       <div class="${escapeAttribute(outerClassName)}">
         <div data-testid="icon-scale-wrapper" class="${escapeAttribute(iconWrapperClassName)}">
-          <span style="font:700 ${item.label.length > 1 ? "16px" : "23px"}/1 Arial,sans-serif;color:currentColor;letter-spacing:0;">${escapeAttribute(item.label)}</span>
+          <span style="display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;font:20px/1 'Segoe UI Emoji','Apple Color Emoji','Noto Color Emoji',Arial,sans-serif;color:currentColor;letter-spacing:0;">${escapeAttribute(item.label)}</span>
         </div>
       </div>
     `;

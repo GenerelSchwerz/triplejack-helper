@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Triplejack Helper
 // @namespace    https://triplejack.com/
-// @version      0.6.19
+// @version      0.6.20
 // @description  Adds Triplejack chat translation, message tools, and session tracking helpers.
 // @author       Rocco A.
 // @license      MIT
@@ -2042,6 +2042,7 @@
 
   // Session history panel
   let sessionHistoryChart = null;
+  let sessionHistoryChartMode = "bbPerHour";
 
   function renderSessionHistoryPanel() {
     if (!document.documentElement) {
@@ -2166,6 +2167,7 @@
         <div style="display:grid;gap:4px;">${report.sessions.map(renderHistorySessionRow).join("")}</div>
       </section>
     `;
+    installSessionHistoryGraphControls();
     renderHistoryTrendChart(report);
   }
 
@@ -2177,8 +2179,20 @@
 
     return `
       <section style="${getHistorySectionStyle()}margin-bottom:12px;">
-        <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px;">
-          <div style="${getHistoryHeadingStyle()}margin-bottom:0;">Selected range graph</div>
+        <div style="display:grid;gap:8px;margin-bottom:10px;">
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
+            <div data-tj-session-history-chart-title style="${getHistoryHeadingStyle()}margin-bottom:0;">Results (big blinds per hour)</div>
+            <div style="display:flex;gap:5px;align-items:center;">
+              <button type="button" data-tj-session-history-zoom="in" title="Zoom in" style="${getHistoryButtonStyle()}">+</button>
+              <button type="button" data-tj-session-history-zoom="out" title="Zoom out" style="${getHistoryButtonStyle()}">-</button>
+              <button type="button" data-tj-session-history-zoom="reset" title="Reset time range" style="${getHistoryButtonStyle()}">All</button>
+            </div>
+          </div>
+          <div style="display:flex;gap:5px;align-items:center;flex-wrap:wrap;">
+            ${renderHistoryChartModeButton("bbPerHour", "BB/hour")}
+            ${renderHistoryChartModeButton("netBigBlinds", "Net BB")}
+            ${renderHistoryChartModeButton("cumulativeBigBlinds", "Cumulative BB")}
+          </div>
         </div>
         <div style="position:relative;height:230px;width:100%;min-width:0;">
           <canvas data-tj-session-history-chart aria-label="Session history graph for selected range" role="img"></canvas>
@@ -2212,41 +2226,44 @@
       return {
         label: period.periodLabel,
         netBigBlinds: Number(period.bigBlindDelta) || 0,
+        bbPerHour: Number.isFinite(Number(period.bigBlindsPerHour)) ? Number(period.bigBlindsPerHour) : null,
         cumulativeBigBlinds,
       };
     });
+    const chartMode = getSessionHistoryChartModeConfig();
+    const chartTitle = sessionHistoryPanel.querySelector("[data-tj-session-history-chart-title]");
+    if (chartTitle) {
+      chartTitle.textContent = chartMode.title;
+    }
 
     sessionHistoryChart = new ChartConstructor(chartElement, {
-      type: "bar",
+      type: "line",
       data: {
         labels: chartPoints.map((point) => point.label),
         datasets: [
           {
-            type: "bar",
-            label: "Net BB",
-            data: chartPoints.map((point) => point.netBigBlinds),
-            backgroundColor: chartPoints.map((point) =>
-              point.netBigBlinds >= 0 ? "rgba(110,168,254,.72)" : "rgba(255,141,122,.76)",
-            ),
-            borderColor: chartPoints.map((point) => (point.netBigBlinds >= 0 ? "#6EA8FE" : "#FF8D7A")),
-            borderWidth: 1,
-            borderRadius: 4,
-            yAxisID: "bigBlinds",
-          },
-          {
-            type: "line",
-            label: "Cumulative BB",
-            data: chartPoints.map((point) => point.cumulativeBigBlinds),
-            borderColor: "#F6C85F",
-            backgroundColor: "rgba(246,200,95,.16)",
+            label: chartMode.label,
+            data: chartPoints.map((point) => point[chartMode.valueKey]),
+            borderColor: chartMode.color,
+            backgroundColor: chartMode.fillColor,
             borderWidth: 2,
-            pointBackgroundColor: "#F6C85F",
+            pointBackgroundColor(context) {
+              const value = Number(context.raw);
+              if (!Number.isFinite(value)) {
+                return "#8FB8C4";
+              }
+
+              return value >= 0 ? chartMode.positiveColor : chartMode.negativeColor;
+            },
             pointBorderColor: "#111820",
             pointBorderWidth: 1,
-            pointRadius: 3,
-            pointHoverRadius: 5,
-            tension: 0.28,
-            yAxisID: "bigBlinds",
+            pointRadius: 4,
+            pointHoverRadius: 6,
+            pointHitRadius: 8,
+            spanGaps: true,
+            tension: 0.3,
+            fill: true,
+            yAxisID: "results",
           },
         ],
       },
@@ -2259,6 +2276,7 @@
         },
         plugins: {
           legend: {
+            display: false,
             labels: {
               color: "#BFE7F1",
               boxWidth: 10,
@@ -2271,7 +2289,7 @@
           tooltip: {
             callbacks: {
               label(context) {
-                return `${context.dataset.label}: ${formatHistorySigned(context.parsed.y)} BB`;
+                return `${context.dataset.label}: ${formatHistoryChartValue(context.parsed.y, chartMode)}`;
               },
             },
           },
@@ -2291,12 +2309,12 @@
               color: "rgba(191,231,241,.08)",
             },
           },
-          bigBlinds: {
+          results: {
             beginAtZero: true,
             ticks: {
               color: "#8FB8C4",
               callback(value) {
-                return formatHistoryAxisValue(value);
+                return formatHistoryChartValue(value, chartMode);
               },
             },
             grid: {
@@ -2306,6 +2324,67 @@
         },
       },
     });
+  }
+
+  function installSessionHistoryGraphControls() {
+    for (const button of sessionHistoryPanel.querySelectorAll("[data-tj-session-history-chart-mode]")) {
+      button.addEventListener("click", () => {
+        sessionHistoryChartMode = button.dataset.tjSessionHistoryChartMode || "bbPerHour";
+        renderSessionHistoryPanelBody();
+      });
+    }
+
+    for (const button of sessionHistoryPanel.querySelectorAll("[data-tj-session-history-zoom]")) {
+      button.addEventListener("click", () => {
+        zoomSessionHistoryDateRange(button.dataset.tjSessionHistoryZoom);
+      });
+    }
+  }
+
+  function renderHistoryChartModeButton(mode, label) {
+    const active = mode === sessionHistoryChartMode;
+    return `
+      <button type="button" data-tj-session-history-chart-mode="${escapeHistoryAttribute(mode)}" style="${getHistoryButtonStyle(active)}">${escapeHistoryHtml(label)}</button>
+    `;
+  }
+
+  function getSessionHistoryChartModeConfig() {
+    if (sessionHistoryChartMode === "netBigBlinds") {
+      return {
+        valueKey: "netBigBlinds",
+        title: "Results (net big blinds)",
+        label: "Net BB",
+        suffix: " BB",
+        color: "#6EA8FE",
+        fillColor: "rgba(110,168,254,.16)",
+        positiveColor: "#6EA8FE",
+        negativeColor: "#FF8D7A",
+      };
+    }
+
+    if (sessionHistoryChartMode === "cumulativeBigBlinds") {
+      return {
+        valueKey: "cumulativeBigBlinds",
+        title: "Results (cumulative big blinds)",
+        label: "Cumulative BB",
+        suffix: " BB",
+        color: "#F6C85F",
+        fillColor: "rgba(246,200,95,.16)",
+        positiveColor: "#F6C85F",
+        negativeColor: "#FF8D7A",
+      };
+    }
+
+    return {
+      valueKey: "bbPerHour",
+      title: "Results (big blinds per hour)",
+      label: "BB/hour",
+      suffix: " BB/h",
+      color: "#7ED6C4",
+      fillColor: "rgba(126,214,196,.14)",
+      positiveColor: "#7ED6C4",
+      negativeColor: "#FF8D7A",
+    };
   }
 
   function renderHistoryMetric(label, value, color = "#F5FAFC") {
@@ -2351,6 +2430,19 @@
 
   function getHistoryInputStyle() {
     return "width:100%;min-width:0;box-sizing:border-box;background:#DDEAF2;color:#111;border:1px solid #74A7B9;border-radius:4px;padding:5px;";
+  }
+
+  function getHistoryButtonStyle(active = false) {
+    return [
+      "border:1px solid rgba(191,231,241,.38)",
+      `background:${active ? "rgba(126,214,196,.22)" : "rgba(8,17,23,.34)"}`,
+      `color:${active ? "#F5FAFC" : "#BFE7F1"}`,
+      "border-radius:4px",
+      "padding:4px 7px",
+      "font:11px/1.1 Arial,sans-serif",
+      "cursor:pointer",
+      "white-space:nowrap",
+    ].join(";");
   }
 
   function getHistoryControlGridStyle() {
@@ -2403,6 +2495,15 @@
     return number.toFixed(1);
   }
 
+  function formatHistoryChartValue(value, chartMode) {
+    const number = Number(value);
+    if (!Number.isFinite(number)) {
+      return "n/a";
+    }
+
+    return `${number >= 0 ? "+" : ""}${number.toFixed(1)}${chartMode.suffix}`;
+  }
+
   function formatHistoryChartTickLabel(label) {
     const text = String(label || "");
     return text.length > 12 ? `${text.slice(0, 11)}...` : text;
@@ -2419,6 +2520,58 @@
 
     sessionHistoryChart.destroy();
     sessionHistoryChart = null;
+  }
+
+  function zoomSessionHistoryDateRange(action) {
+    const startInput = sessionHistoryPanel?.querySelector("[data-tj-session-history-start]");
+    const endInput = sessionHistoryPanel?.querySelector("[data-tj-session-history-end]");
+    if (!startInput || !endInput) {
+      return;
+    }
+
+    const fullRange = getSessionHistoryDateRange();
+    if (action === "reset") {
+      startInput.value = fullRange.startDate;
+      endInput.value = fullRange.endDate;
+      renderSessionHistoryPanelBody();
+      return;
+    }
+
+    const startTime = parseHistoryDateInput(startInput.value || fullRange.startDate);
+    const endTime = parseHistoryDateInput(endInput.value || fullRange.endDate);
+    if (!Number.isFinite(startTime) || !Number.isFinite(endTime)) {
+      return;
+    }
+
+    const fullStartTime = parseHistoryDateInput(fullRange.startDate);
+    const fullEndTime = parseHistoryDateInput(fullRange.endDate);
+    const dayMs = 86400000;
+    const inclusiveRangeMs = Math.max(dayMs, endTime - startTime + dayMs);
+    const nextRangeMs = action === "in" ? Math.max(dayMs, inclusiveRangeMs / 2) : inclusiveRangeMs * 2;
+    const centerTime = startTime + inclusiveRangeMs / 2;
+    let nextStartTime = centerTime - nextRangeMs / 2;
+    let nextEndTime = centerTime + nextRangeMs / 2 - dayMs;
+
+    if (Number.isFinite(fullStartTime) && Number.isFinite(fullEndTime)) {
+      if (nextStartTime < fullStartTime) {
+        nextEndTime += fullStartTime - nextStartTime;
+        nextStartTime = fullStartTime;
+      }
+      if (nextEndTime > fullEndTime) {
+        nextStartTime -= nextEndTime - fullEndTime;
+        nextEndTime = fullEndTime;
+      }
+      nextStartTime = Math.max(nextStartTime, fullStartTime);
+      nextEndTime = Math.min(nextEndTime, fullEndTime);
+    }
+
+    startInput.value = formatSessionDateInput(nextStartTime);
+    endInput.value = formatSessionDateInput(Math.max(nextStartTime, nextEndTime));
+    renderSessionHistoryPanelBody();
+  }
+
+  function parseHistoryDateInput(value) {
+    return new Date(`${value}T00:00:00`).getTime();
   }
 
   function formatHistoryDateTime(timestamp) {

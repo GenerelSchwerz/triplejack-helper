@@ -15,7 +15,7 @@ Open the raw `triplejack.user.js` file from this repository in your browser and 
 - Optional message timestamps.
 - Optional table session summary when leaving a room.
 - Persistent session history with date, room type, and period filters.
-- Session history charting for net BB and cumulative BB over the selected time range.
+- Session history charting with selectable BB/hour, net BB, and cumulative BB line views over the selected time range.
 
 ## External Libraries
 

@@ -252,6 +252,7 @@
       options: {
         responsive: true,
         maintainAspectRatio: false,
+        animation: false,
         layout: {
           padding: {
             top: 18,
@@ -335,10 +336,14 @@
   }
 
   function scheduleSessionHistoryChartResize() {
-    window.requestAnimationFrame(() => {
+    const refresh = () => {
       sessionHistoryChart?.resize?.();
       sessionHistoryChart?.update?.("none");
-    });
+    };
+
+    window.requestAnimationFrame(refresh);
+    window.requestAnimationFrame(() => window.requestAnimationFrame(refresh));
+    window.setTimeout(refresh, 120);
   }
 
   function installSessionHistoryGraphControls() {
@@ -413,32 +418,44 @@
 
   function renderHistoryPeriodRow(period) {
     return `
-      <div style="display:grid;grid-template-columns:minmax(110px,1fr) repeat(3,minmax(56px,auto));gap:8px;align-items:center;">
-        <span>${escapeHistoryHtml(period.periodLabel)}</span>
-        <span style="color:#8FB8C4;">${period.sessions} ses</span>
-        <strong style="color:${getHistoryStatColor(period.bigBlindDelta)};">${formatHistorySigned(period.bigBlindDelta)} BB</strong>
-        <span style="color:${getHistoryStatColor(period.bigBlindDelta)};">${formatHistorySigned(period.bigBlindsPerHour)}/h</span>
+      <div style="${getHistoryCompactRowStyle()}">
+        <div style="${getHistoryRowPrimaryLineStyle()}">
+          <span style="${getHistoryRowLabelStyle()}">${escapeHistoryHtml(period.periodLabel)}</span>
+          <span style="${getHistoryRowMutedValueStyle()}">${period.sessions} ses</span>
+        </div>
+        <div style="${getHistoryRowMetricLineStyle()}">
+          <strong style="${getHistoryRowMetricStyle(getHistoryStatColor(period.bigBlindDelta))}">${formatHistorySigned(period.bigBlindDelta)} BB</strong>
+          <span style="${getHistoryRowMetricStyle(getHistoryStatColor(period.bigBlindDelta))}">${formatHistorySigned(period.bigBlindsPerHour)}/h</span>
+        </div>
       </div>
     `;
   }
 
   function renderHistoryRoomRow(roomStats) {
     return `
-      <div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(48px,auto) minmax(62px,auto);gap:8px;align-items:center;">
-        <span style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${escapeHistoryAttribute(roomStats.roomType)}">${escapeHistoryHtml(roomStats.roomType)}</span>
-        <span style="color:#8FB8C4;">${roomStats.sessions} ses</span>
-        <strong style="color:${getHistoryStatColor(roomStats.bigBlindDelta)};">${formatHistorySigned(roomStats.bigBlindsPerHour)}/h</strong>
+      <div style="${getHistoryCompactRowStyle()}">
+        <div style="${getHistoryRowPrimaryLineStyle()}">
+          <span style="${getHistoryRowLabelStyle()}" title="${escapeHistoryAttribute(roomStats.roomType)}">${escapeHistoryHtml(roomStats.roomType)}</span>
+          <span style="${getHistoryRowMutedValueStyle()}">${roomStats.sessions} ses</span>
+        </div>
+        <div style="${getHistoryRowMetricLineStyle()}">
+          <strong style="${getHistoryRowMetricStyle(getHistoryStatColor(roomStats.bigBlindDelta))}">${formatHistorySigned(roomStats.bigBlindsPerHour)}/h</strong>
+        </div>
       </div>
     `;
   }
 
   function renderHistorySessionRow(session) {
     return `
-      <div style="display:grid;grid-template-columns:minmax(88px,1fr) repeat(3,minmax(58px,auto));gap:8px;border-top:1px solid rgba(191,231,241,.1);padding-top:4px;align-items:center;">
-        <span style="color:#8FB8C4;">${escapeHistoryHtml(formatHistoryDateTime(session.endedAt))}</span>
-        <strong style="color:${getHistoryStatColor(session.bigBlindDelta)};">${formatHistorySigned(session.bigBlindDelta)} BB</strong>
-        <span style="color:${getHistoryStatColor(session.bigBlindDelta)};">${formatHistorySigned(session.bigBlindsPerHour)}/h</span>
-        <span style="color:#8FB8C4;">${formatHistoryDuration(session.durationMs)}</span>
+      <div style="${getHistoryCompactRowStyle()}border-top:1px solid rgba(191,231,241,.1);padding-top:4px;">
+        <div style="${getHistoryRowPrimaryLineStyle()}">
+          <span style="${getHistoryRowLabelStyle()}color:#8FB8C4;">${escapeHistoryHtml(formatHistoryDateTime(session.endedAt))}</span>
+          <span style="${getHistoryRowMutedValueStyle()}">${formatHistoryDuration(session.durationMs)}</span>
+        </div>
+        <div style="${getHistoryRowMetricLineStyle()}">
+          <strong style="${getHistoryRowMetricStyle(getHistoryStatColor(session.bigBlindDelta))}">${formatHistorySigned(session.bigBlindDelta)} BB</strong>
+          <span style="${getHistoryRowMetricStyle(getHistoryStatColor(session.bigBlindDelta))}">${formatHistorySigned(session.bigBlindsPerHour)}/h</span>
+        </div>
       </div>
     `;
   }
@@ -469,7 +486,7 @@
   }
 
   function getHistorySplitGridStyle() {
-    return "display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px;margin-bottom:12px;";
+    return "display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:12px;margin-bottom:12px;";
   }
 
   function getHistorySectionStyle() {
@@ -478,6 +495,30 @@
 
   function getHistoryHeadingStyle() {
     return "margin-bottom:6px;color:#BFE7F1;font-weight:700;";
+  }
+
+  function getHistoryCompactRowStyle() {
+    return "display:grid;gap:3px;min-width:0;";
+  }
+
+  function getHistoryRowPrimaryLineStyle() {
+    return "display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:baseline;min-width:0;";
+  }
+
+  function getHistoryRowMetricLineStyle() {
+    return "display:flex;justify-content:flex-end;gap:14px;align-items:baseline;min-width:0;flex-wrap:wrap;text-align:right;";
+  }
+
+  function getHistoryRowLabelStyle() {
+    return "min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;";
+  }
+
+  function getHistoryRowMutedValueStyle() {
+    return "color:#8FB8C4;white-space:nowrap;";
+  }
+
+  function getHistoryRowMetricStyle(color) {
+    return `color:${color};white-space:nowrap;`;
   }
 
   function formatHistorySigned(value) {

@@ -293,6 +293,7 @@
         },
         scales: {
           x: {
+            axis: "x",
             offset: chartPoints.length === 1,
             ticks: {
               color: "#8FB8C4",
@@ -306,11 +307,22 @@
             },
           },
           results: {
+            axis: "y",
+            position: "left",
             beginAtZero: true,
             min: -yLimit,
             max: yLimit,
+            title: {
+              display: true,
+              text: chartMode.axisLabel,
+              color: "#8FB8C4",
+              font: {
+                size: 11,
+                weight: "700",
+              },
+            },
             afterFit(scale) {
-              scale.width = Math.max(scale.width, 46);
+              scale.width = Math.max(scale.width, 54);
             },
             ticks: {
               color: "#8FB8C4",
@@ -374,6 +386,7 @@
         valueKey: "netBigBlinds",
         title: "Results (net big blinds)",
         label: "Net BB",
+        axisLabel: "Net BB",
         suffix: " BB",
         color: "#6EA8FE",
         fillColor: "rgba(110,168,254,.16)",
@@ -387,6 +400,7 @@
         valueKey: "cumulativeBigBlinds",
         title: "Results (cumulative big blinds)",
         label: "Cumulative BB",
+        axisLabel: "Cumulative BB",
         suffix: " BB",
         color: "#F6C85F",
         fillColor: "rgba(246,200,95,.16)",
@@ -399,6 +413,7 @@
       valueKey: "bbPerHour",
       title: "Results (big blinds per hour)",
       label: "BB/hour",
+      axisLabel: "BB/hour",
       suffix: " BB/h",
       color: "#7ED6C4",
       fillColor: "rgba(126,214,196,.14)",

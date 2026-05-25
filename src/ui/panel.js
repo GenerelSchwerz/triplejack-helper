@@ -67,6 +67,14 @@
               <span>Use custom panel width</span>
               <input data-tj-helper-panel-width-enabled type="checkbox" style="margin:0;" />
             </label>
+            <input
+              data-tj-helper-panel-width
+              type="range"
+              min="${HELPER_PANEL_MIN_WIDTH}"
+              max="${HELPER_PANEL_MAX_WIDTH}"
+              step="1"
+              style="width:100%;margin:9px 0 0;accent-color:#7ED6C4;"
+            />
             <div data-tj-helper-panel-width-value style="margin-top:6px;color:#8FB8C4;font-size:11px;"></div>
           </section>
           <div style="border-top:1px solid rgba(191,231,241,.22);padding-top:8px;">
@@ -85,6 +93,8 @@
       const messageTimestampsInput = statusPanel.querySelector("[data-tj-helper-message-timestamps-enabled]");
       const sessionSummaryInput = statusPanel.querySelector("[data-tj-helper-session-summary-enabled]");
       const panelWidthEnabledInput = statusPanel.querySelector("[data-tj-helper-panel-width-enabled]");
+      const panelWidthInput = statusPanel.querySelector("[data-tj-helper-panel-width]");
+      const panelWidthValueElement = statusPanel.querySelector("[data-tj-helper-panel-width-value]");
 
       for (const [value, label] of LANGUAGE_OPTIONS) {
         const option = document.createElement("option");
@@ -129,6 +139,18 @@
       panelWidthEnabledInput.addEventListener("change", () => {
         setHelperPanelWidthEnabled(panelWidthEnabledInput.checked);
       });
+
+      panelWidthInput.addEventListener("input", () => {
+        setHelperPanelWidth(panelWidthInput.value, { silent: true });
+        refreshNativeLayoutAfterPanelWidthChange();
+        panelWidthEnabledInput.checked = getHelperPanelWidthEnabled();
+        panelWidthValueElement.textContent = `Current custom width: ${getHelperPanelWidth()}px`;
+      });
+
+      panelWidthInput.addEventListener("change", () => {
+        setHelperPanelWidth(panelWidthInput.value);
+        refreshNativeLayoutAfterPanelWidthChange();
+      });
     }
 
     const targetLanguage = getTargetLanguage();
@@ -141,6 +163,7 @@
     const messageTimestampsInput = statusPanel.querySelector("[data-tj-helper-message-timestamps-enabled]");
     const sessionSummaryInput = statusPanel.querySelector("[data-tj-helper-session-summary-enabled]");
     const panelWidthEnabledInput = statusPanel.querySelector("[data-tj-helper-panel-width-enabled]");
+    const panelWidthInput = statusPanel.querySelector("[data-tj-helper-panel-width]");
     const panelWidthValueElement = statusPanel.querySelector("[data-tj-helper-panel-width-value]");
     const statsElement = statusPanel.querySelector("[data-tj-helper-stats]");
     const statusElement = statusPanel.querySelector("[data-tj-helper-status]");
@@ -159,6 +182,9 @@
     messageTimestampsInput.checked = getMessageTimestampsEnabled();
     sessionSummaryInput.checked = getSessionSummaryEnabled();
     panelWidthEnabledInput.checked = getHelperPanelWidthEnabled();
+    panelWidthInput.value = String(getHelperPanelWidth());
+    panelWidthInput.disabled = !getHelperPanelWidthEnabled();
+    panelWidthInput.style.opacity = getHelperPanelWidthEnabled() ? "1" : ".48";
     panelWidthValueElement.textContent = `Current custom width: ${getHelperPanelWidth()}px`;
     statsElement.textContent = `${state.hooked ? "hooked" : "not hooked"} | sockets ${state.sockets}, messages ${state.chatsSeen}, translations ${state.translationsShown}`;
     statusElement.textContent = state.lastStatus;

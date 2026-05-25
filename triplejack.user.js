@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Triplejack Helper
 // @namespace    https://triplejack.com/
-// @version      0.6.27
+// @version      0.6.28
 // @description  Adds Triplejack chat translation, message tools, and session tracking helpers.
 // @author       Rocco A.
 // @license      MIT
@@ -1295,15 +1295,18 @@
 
     if (!getHelperPanelWidthEnabled()) {
       clearHelperPanelWidth(panelContainer);
+      clearNativeStageWidthStyle();
       if (panelContainer.dataset.tjHelperPanelContainer || panelRegion.dataset.tjHelperPanelRegion) {
         setPanelWidthStyle(panelRegion, HELPER_PANEL_WIDTH);
         setPanelWidthStyle(panelContainer, HELPER_PANEL_WIDTH);
+        setNativeStageWidthStyle(HELPER_PANEL_WIDTH);
       }
       scheduleLayoutRefresh();
       return;
     }
 
     const panelWidth = getResolvedHelperPanelWidth();
+    setNativeStageWidthStyle(panelWidth);
     setPanelWidthStyle(panelRegion, panelWidth);
     setPanelWidthStyle(panelContainer, panelWidth);
     for (const child of panelContainer.children) {
@@ -1378,6 +1381,38 @@
       "overflow",
     ]) {
       element.style.removeProperty(property);
+    }
+  }
+
+  function setNativeStageWidthStyle(panelWidth) {
+    const stageContainer = document.querySelector('[data-testid="poker-stage-container"]');
+    const sceneRow = stageContainer?.parentElement;
+    if (!stageContainer?.style || !sceneRow?.style) {
+      return;
+    }
+
+    sceneRow.style.setProperty("min-width", "0", "important");
+    sceneRow.style.setProperty("overflow", "hidden", "important");
+    stageContainer.style.setProperty("flex", "1 1 0", "important");
+    stageContainer.style.setProperty("flex-basis", "0", "important");
+    stageContainer.style.setProperty("width", `calc(100% - ${panelWidth}px)`, "important");
+    stageContainer.style.setProperty("min-width", "0", "important");
+    stageContainer.style.setProperty("max-width", `calc(100% - ${panelWidth}px)`, "important");
+    stageContainer.style.setProperty("overflow", "hidden", "important");
+  }
+
+  function clearNativeStageWidthStyle() {
+    const stageContainer = document.querySelector('[data-testid="poker-stage-container"]');
+    const sceneRow = stageContainer?.parentElement;
+    if (sceneRow?.style) {
+      sceneRow.style.removeProperty("overflow");
+    }
+    if (!stageContainer?.style) {
+      return;
+    }
+
+    for (const property of ["flex", "flex-basis", "width", "min-width", "max-width", "overflow"]) {
+      stageContainer.style.removeProperty(property);
     }
   }
 
@@ -1596,7 +1631,16 @@
       return;
     }
 
-    const width = Math.round(stageContainer.clientWidth || stageContainer.getBoundingClientRect().width || 0);
+    const panelContainer = document.querySelector('[data-testid="panel-container"]');
+    const sceneRow = stageContainer.parentElement;
+    const panelWidth = Math.round(panelContainer?.parentElement?.getBoundingClientRect?.().width || 0);
+    const rowWidth = Math.round(sceneRow?.clientWidth || sceneRow?.getBoundingClientRect?.().width || 0);
+    const width = Math.round(
+      (rowWidth && panelWidth ? rowWidth - panelWidth : 0) ||
+        stageContainer.clientWidth ||
+        stageContainer.getBoundingClientRect().width ||
+        0,
+    );
     const height = Math.round(stageContainer.clientHeight || stageContainer.getBoundingClientRect().height || 0);
     if (width <= 0 || height <= 0) {
       return;
@@ -3698,6 +3742,14 @@
               <span>Use custom panel width</span>
               <input data-tj-helper-panel-width-enabled type="checkbox" style="margin:0;" />
             </label>
+            <input
+              data-tj-helper-panel-width
+              type="range"
+              min="${HELPER_PANEL_MIN_WIDTH}"
+              max="${HELPER_PANEL_MAX_WIDTH}"
+              step="1"
+              style="width:100%;margin:9px 0 0;accent-color:#7ED6C4;"
+            />
             <div data-tj-helper-panel-width-value style="margin-top:6px;color:#8FB8C4;font-size:11px;"></div>
           </section>
           <div style="border-top:1px solid rgba(191,231,241,.22);padding-top:8px;">
@@ -3716,6 +3768,8 @@
       const messageTimestampsInput = statusPanel.querySelector("[data-tj-helper-message-timestamps-enabled]");
       const sessionSummaryInput = statusPanel.querySelector("[data-tj-helper-session-summary-enabled]");
       const panelWidthEnabledInput = statusPanel.querySelector("[data-tj-helper-panel-width-enabled]");
+      const panelWidthInput = statusPanel.querySelector("[data-tj-helper-panel-width]");
+      const panelWidthValueElement = statusPanel.querySelector("[data-tj-helper-panel-width-value]");
 
       for (const [value, label] of LANGUAGE_OPTIONS) {
         const option = document.createElement("option");
@@ -3760,6 +3814,18 @@
       panelWidthEnabledInput.addEventListener("change", () => {
         setHelperPanelWidthEnabled(panelWidthEnabledInput.checked);
       });
+
+      panelWidthInput.addEventListener("input", () => {
+        setHelperPanelWidth(panelWidthInput.value, { silent: true });
+        refreshNativeLayoutAfterPanelWidthChange();
+        panelWidthEnabledInput.checked = getHelperPanelWidthEnabled();
+        panelWidthValueElement.textContent = `Current custom width: ${getHelperPanelWidth()}px`;
+      });
+
+      panelWidthInput.addEventListener("change", () => {
+        setHelperPanelWidth(panelWidthInput.value);
+        refreshNativeLayoutAfterPanelWidthChange();
+      });
     }
 
     const targetLanguage = getTargetLanguage();
@@ -3772,6 +3838,7 @@
     const messageTimestampsInput = statusPanel.querySelector("[data-tj-helper-message-timestamps-enabled]");
     const sessionSummaryInput = statusPanel.querySelector("[data-tj-helper-session-summary-enabled]");
     const panelWidthEnabledInput = statusPanel.querySelector("[data-tj-helper-panel-width-enabled]");
+    const panelWidthInput = statusPanel.querySelector("[data-tj-helper-panel-width]");
     const panelWidthValueElement = statusPanel.querySelector("[data-tj-helper-panel-width-value]");
     const statsElement = statusPanel.querySelector("[data-tj-helper-stats]");
     const statusElement = statusPanel.querySelector("[data-tj-helper-status]");
@@ -3790,6 +3857,9 @@
     messageTimestampsInput.checked = getMessageTimestampsEnabled();
     sessionSummaryInput.checked = getSessionSummaryEnabled();
     panelWidthEnabledInput.checked = getHelperPanelWidthEnabled();
+    panelWidthInput.value = String(getHelperPanelWidth());
+    panelWidthInput.disabled = !getHelperPanelWidthEnabled();
+    panelWidthInput.style.opacity = getHelperPanelWidthEnabled() ? "1" : ".48";
     panelWidthValueElement.textContent = `Current custom width: ${getHelperPanelWidth()}px`;
     statsElement.textContent = `${state.hooked ? "hooked" : "not hooked"} | sockets ${state.sockets}, messages ${state.chatsSeen}, translations ${state.translationsShown}`;
     statusElement.textContent = state.lastStatus;

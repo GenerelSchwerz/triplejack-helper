@@ -361,15 +361,18 @@
 
     if (!getHelperPanelWidthEnabled()) {
       clearHelperPanelWidth(panelContainer);
+      clearNativeStageWidthStyle();
       if (panelContainer.dataset.tjHelperPanelContainer || panelRegion.dataset.tjHelperPanelRegion) {
         setPanelWidthStyle(panelRegion, HELPER_PANEL_WIDTH);
         setPanelWidthStyle(panelContainer, HELPER_PANEL_WIDTH);
+        setNativeStageWidthStyle(HELPER_PANEL_WIDTH);
       }
       scheduleLayoutRefresh();
       return;
     }
 
     const panelWidth = getResolvedHelperPanelWidth();
+    setNativeStageWidthStyle(panelWidth);
     setPanelWidthStyle(panelRegion, panelWidth);
     setPanelWidthStyle(panelContainer, panelWidth);
     for (const child of panelContainer.children) {
@@ -444,6 +447,38 @@
       "overflow",
     ]) {
       element.style.removeProperty(property);
+    }
+  }
+
+  function setNativeStageWidthStyle(panelWidth) {
+    const stageContainer = document.querySelector('[data-testid="poker-stage-container"]');
+    const sceneRow = stageContainer?.parentElement;
+    if (!stageContainer?.style || !sceneRow?.style) {
+      return;
+    }
+
+    sceneRow.style.setProperty("min-width", "0", "important");
+    sceneRow.style.setProperty("overflow", "hidden", "important");
+    stageContainer.style.setProperty("flex", "1 1 0", "important");
+    stageContainer.style.setProperty("flex-basis", "0", "important");
+    stageContainer.style.setProperty("width", `calc(100% - ${panelWidth}px)`, "important");
+    stageContainer.style.setProperty("min-width", "0", "important");
+    stageContainer.style.setProperty("max-width", `calc(100% - ${panelWidth}px)`, "important");
+    stageContainer.style.setProperty("overflow", "hidden", "important");
+  }
+
+  function clearNativeStageWidthStyle() {
+    const stageContainer = document.querySelector('[data-testid="poker-stage-container"]');
+    const sceneRow = stageContainer?.parentElement;
+    if (sceneRow?.style) {
+      sceneRow.style.removeProperty("overflow");
+    }
+    if (!stageContainer?.style) {
+      return;
+    }
+
+    for (const property of ["flex", "flex-basis", "width", "min-width", "max-width", "overflow"]) {
+      stageContainer.style.removeProperty(property);
     }
   }
 
@@ -662,7 +697,16 @@
       return;
     }
 
-    const width = Math.round(stageContainer.clientWidth || stageContainer.getBoundingClientRect().width || 0);
+    const panelContainer = document.querySelector('[data-testid="panel-container"]');
+    const sceneRow = stageContainer.parentElement;
+    const panelWidth = Math.round(panelContainer?.parentElement?.getBoundingClientRect?.().width || 0);
+    const rowWidth = Math.round(sceneRow?.clientWidth || sceneRow?.getBoundingClientRect?.().width || 0);
+    const width = Math.round(
+      (rowWidth && panelWidth ? rowWidth - panelWidth : 0) ||
+        stageContainer.clientWidth ||
+        stageContainer.getBoundingClientRect().width ||
+        0,
+    );
     const height = Math.round(stageContainer.clientHeight || stageContainer.getBoundingClientRect().height || 0);
     if (width <= 0 || height <= 0) {
       return;

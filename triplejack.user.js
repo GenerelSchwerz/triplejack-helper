@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Triplejack Helper
 // @namespace    https://triplejack.com/
-// @version      0.6.28
+// @version      0.6.29
 // @description  Adds Triplejack chat translation, message tools, and session tracking helpers.
 // @author       Rocco A.
 // @license      MIT
@@ -994,11 +994,13 @@
   function closeHelperPanels() {
     pendingHelperPanelOpenId += 1;
     const shellButton = helperShellNativeButton;
-    setActiveHelperPanel("");
+    state.activePanelId = "";
+    renderHelperPanels({ preservePanelShell: false });
     if (shellButton?.isConnected) {
       dispatchNativePanelPointerDown(shellButton);
     }
     helperShellNativeButton = null;
+    scheduleHelperPanelCloseCleanup();
   }
 
   function setActiveHelperPanel(panelId) {
@@ -1010,14 +1012,14 @@
     renderHelperPanels();
   }
 
-  function renderHelperPanels() {
+  function renderHelperPanels(options = {}) {
     logPanelDebug("render-helper-panels", {
       activePanelId: state.activePanelId,
       hasHelperPanelHost: Boolean(helperPanelHost?.isConnected),
     });
 
     if (!state.activePanelId) {
-      removeHelperPanelHost({ preservePanelShell: Boolean(helperShellNativeButton) });
+      removeHelperPanelHost({ preservePanelShell: options.preservePanelShell ?? Boolean(helperShellNativeButton) });
     } else {
       getHelperPanelMount();
     }
@@ -1126,6 +1128,7 @@
     }
 
     helperPanelHost = null;
+    clearHelperPanelLayoutOverrides();
     if (!options.preservePanelShell) {
       removeEmptyHelperPanelRegion();
     }
@@ -1337,11 +1340,6 @@
     element.style.setProperty("width", `${panelWidth}px`, "important");
     element.style.setProperty("min-width", `${panelWidth}px`, "important");
     element.style.setProperty("max-width", `min(${panelWidth}px,calc(100vw - 64px))`, "important");
-    const stageHeight = getNativeStageHeight();
-    element.style.setProperty("height", stageHeight ? `${stageHeight}px` : "100%", "important");
-    element.style.setProperty("min-height", "0", "important");
-    element.style.setProperty("align-self", "stretch", "important");
-    element.style.setProperty("overflow", "hidden", "important");
   }
 
   function setPanelFillStyle(element) {
@@ -1349,12 +1347,11 @@
       return;
     }
 
-    const stageHeight = getNativeStageHeight();
     element.style.setProperty("flex", "1 1 auto", "important");
     element.style.setProperty("width", "100%", "important");
     element.style.setProperty("min-width", "0", "important");
     element.style.setProperty("max-width", "100%", "important");
-    element.style.setProperty("height", stageHeight ? `${stageHeight}px` : "100%", "important");
+    element.style.setProperty("height", "100%", "important");
     element.style.setProperty("min-height", "0", "important");
     element.style.setProperty("align-self", "stretch", "important");
     element.style.setProperty("overflow", "hidden", "important");
@@ -1406,6 +1403,7 @@
     const sceneRow = stageContainer?.parentElement;
     if (sceneRow?.style) {
       sceneRow.style.removeProperty("overflow");
+      sceneRow.style.removeProperty("min-width");
     }
     if (!stageContainer?.style) {
       return;
@@ -1414,6 +1412,24 @@
     for (const property of ["flex", "flex-basis", "width", "min-width", "max-width", "overflow"]) {
       stageContainer.style.removeProperty(property);
     }
+  }
+
+  function clearHelperPanelLayoutOverrides(panelContainer = document.querySelector('[data-testid="panel-container"]')) {
+    clearHelperPanelWidth(panelContainer);
+    clearNativeStageWidthStyle();
+  }
+
+  function scheduleHelperPanelCloseCleanup() {
+    const cleanup = () => {
+      clearHelperPanelLayoutOverrides();
+      if (!state.activePanelId && !getActiveNativePanelButton()) {
+        removeEmptyHelperPanelRegion();
+      }
+      window.dispatchEvent(new Event("resize"));
+    };
+
+    window.requestAnimationFrame(cleanup);
+    window.setTimeout(cleanup, 120);
   }
 
   function refreshNativeLayoutAfterPanelWidthChange() {
@@ -1435,7 +1451,17 @@
 
   function scheduleNativePanelWidthApply() {
     const refresh = () => {
-      applyHelperPanelWidth();
+      const panelContainer = document.querySelector('[data-testid="panel-container"]');
+      const activeNativePanelButton = getActiveNativePanelButton();
+      if (!state.activePanelId && !activeNativePanelButton && !panelContainer?.dataset.tjHelperPanelContainer) {
+        clearHelperPanelLayoutOverrides(panelContainer);
+        removeEmptyHelperPanelRegion();
+        resizeNativeStageToContainer();
+        window.dispatchEvent(new Event("resize"));
+        return;
+      }
+
+      applyHelperPanelWidth(panelContainer);
       syncNativePanelGeometry();
       resizeNativeStageToContainer();
       scheduleLayoutRefresh();
@@ -1482,6 +1508,7 @@
     pendingHelperPanelOpenId += 1;
     state.activePanelId = "";
     removeHelperPanelHost({ preservePanelShell: true });
+    clearHelperPanelLayoutOverrides();
     helperShellNativeButton = null;
     renderToolbarButtons();
     if (clickedShellButton) {
@@ -1595,15 +1622,15 @@
       return;
     }
 
-    const stageHeight = getNativeStageHeight();
-    if (stageHeight > 0) {
-      panelRegion.style.setProperty("height", `${stageHeight}px`, "important");
-      panelContainer.style.setProperty("height", `${stageHeight}px`, "important");
+    if (state.activePanelId && helperPanelHost?.isConnected) {
+      panelRegion.style.setProperty("height", "100%", "important");
+      panelContainer.style.setProperty("height", "100%", "important");
       for (const child of panelContainer.children) {
-        child.style.setProperty("height", `${stageHeight}px`, "important");
+        child.style.setProperty("height", "100%", "important");
       }
     }
 
+    const stageHeight = getNativeStageHeight();
     positionHelperPanelResizeHandle(panelRegion, stageHeight);
   }
 

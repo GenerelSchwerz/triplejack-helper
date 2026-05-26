@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Triplejack Helper
 // @namespace    https://triplejack.com/
-// @version      0.8.46
+// @version      0.8.47
 // @description  Adds Triplejack chat translation, message tools, and session tracking helpers.
 // @author       Rocco A.
 // @license      MIT
@@ -3834,7 +3834,7 @@
         </section>
         <section style="${getHistorySectionStyle()}">
           <div style="${getHistoryHeadingStyle()}">Room types</div>
-          <div style="display:grid;gap:5px;">${report.byRoomType.map(renderHistoryRoomRow).join("")}</div>
+          <div style="${getHistoryRoomListStyle()}">${report.byRoomType.map(renderHistoryRoomRow).join("")}</div>
         </section>
       </div>
       <section style="${getHistorySectionStyle()}">
@@ -4264,8 +4264,12 @@
     return "display:grid;grid-template-columns:minmax(0,1fr) minmax(34px,auto) minmax(60px,auto) minmax(58px,auto);gap:6px;align-items:center;min-width:0;";
   }
 
+  function getHistoryRoomListStyle() {
+    return "display:grid;grid-template-columns:minmax(max-content,1fr) max-content max-content;gap:5px 8px;align-items:center;min-width:0;";
+  }
+
   function getHistoryRoomRowStyle() {
-    return "display:grid;grid-template-columns:minmax(max-content,1fr) max-content max-content;gap:6px;align-items:center;min-width:0;";
+    return "display:contents;";
   }
 
   function getHistorySessionRowStyle() {

@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Triplejack Helper
 // @namespace    https://triplejack.com/
-// @version      0.8.47
+// @version      0.8.48
 // @description  Adds Triplejack chat translation, message tools, and session tracking helpers.
 // @author       Rocco A.
 // @license      MIT
@@ -5168,7 +5168,13 @@
               <label data-tj-helper-quick-bomb-duration-label>Seconds</label>
               <input data-tj-helper-quick-bomb-duration type="number" step="1" style="min-width:0;background:#DDEAF2;color:#111;border:1px solid #74A7B9;border-radius:4px;padding:4px;" />
               <label data-tj-helper-quick-bomb-ammo-label>Ammo</label>
-              <input data-tj-helper-quick-bomb-ammo type="number" step="1" style="min-width:0;background:#DDEAF2;color:#111;border:1px solid #74A7B9;border-radius:4px;padding:4px;" />
+              <div data-tj-helper-quick-bomb-ammo-controls style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:4px;min-width:0;">
+                <button data-tj-helper-quick-bomb-ammo-step="-100" type="button" style="${getQuickBombSmallButtonStyle()}">-100</button>
+                <button data-tj-helper-quick-bomb-ammo-step="-10" type="button" style="${getQuickBombSmallButtonStyle()}">-10</button>
+                <input data-tj-helper-quick-bomb-ammo type="number" step="1" style="grid-column:1/-1;min-width:0;background:#DDEAF2;color:#111;border:1px solid #74A7B9;border-radius:4px;padding:4px;" />
+                <button data-tj-helper-quick-bomb-ammo-step="10" type="button" style="${getQuickBombSmallButtonStyle()}">+10</button>
+                <button data-tj-helper-quick-bomb-ammo-step="100" type="button" style="${getQuickBombSmallButtonStyle()}">+100</button>
+              </div>
             </div>
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:8px;">
               <button data-tj-helper-quick-bomb-start type="button" style="background:#7ED6C4;color:#0B1B20;border:0;border-radius:4px;padding:5px 8px;font-weight:700;">Start</button>
@@ -5229,6 +5235,19 @@
       quickBombPanel.querySelector("[data-tj-helper-quick-bomb-ammo]").addEventListener("change", (event) => {
         setQuickBombAmmo(event.target.value);
       });
+      quickBombPanel.querySelector("[data-tj-helper-quick-bomb-ammo-controls]").addEventListener("click", (event) => {
+        const stepButton = event.target.closest("[data-tj-helper-quick-bomb-ammo-step]");
+        if (!stepButton) {
+          return;
+        }
+
+        const step = parseInt(stepButton.dataset.tjHelperQuickBombAmmoStep, 10);
+        if (!Number.isFinite(step)) {
+          return;
+        }
+
+        setQuickBombAmmo(Math.max(1, getQuickBombAmmo() + step));
+      });
       quickBombPanel.querySelector("[data-tj-helper-quick-bomb-item-sort]").addEventListener("change", (event) => {
         setQuickBombItemSort(event.target.value);
       });
@@ -5276,6 +5295,7 @@
     const modeSelect = quickBombPanel.querySelector("[data-tj-helper-quick-bomb-mode]");
     const durationInput = quickBombPanel.querySelector("[data-tj-helper-quick-bomb-duration]");
     const ammoInput = quickBombPanel.querySelector("[data-tj-helper-quick-bomb-ammo]");
+    const ammoControls = quickBombPanel.querySelector("[data-tj-helper-quick-bomb-ammo-controls]");
     const durationLabel = quickBombPanel.querySelector("[data-tj-helper-quick-bomb-duration-label]");
     const ammoLabel = quickBombPanel.querySelector("[data-tj-helper-quick-bomb-ammo-label]");
     const startButton = quickBombPanel.querySelector("[data-tj-helper-quick-bomb-start]");
@@ -5293,7 +5313,7 @@
     ammoInput.value = String(getQuickBombAmmo());
     durationInput.style.display = getQuickBombMode() === "duration" ? "" : "none";
     durationLabel.style.display = getQuickBombMode() === "duration" ? "" : "none";
-    ammoInput.style.display = getQuickBombMode() === "ammo" ? "" : "none";
+    ammoControls.style.display = getQuickBombMode() === "ammo" ? "grid" : "none";
     ammoLabel.style.display = getQuickBombMode() === "ammo" ? "" : "none";
     itemSortSelect.value = getQuickBombItemSort();
 
@@ -5360,6 +5380,10 @@
 
   function compareQuickBombItemNames(a, b) {
     return String(a.label || a.itemKey).localeCompare(String(b.label || b.itemKey));
+  }
+
+  function getQuickBombSmallButtonStyle() {
+    return "min-width:0;background:rgba(191,231,241,.12);color:#BFE7F1;border:1px solid rgba(191,231,241,.36);border-radius:4px;padding:3px 4px;font:11px/1.1 Arial,sans-serif;font-weight:700;cursor:pointer;";
   }
 
   function renderQuickBombTargets(targetsElement) {

@@ -52,6 +52,11 @@
     );
   }
 
+  function getQuickBombItemSort() {
+    const sort = localStorage.getItem(QUICK_BOMB_ITEM_SORT_STORAGE_KEY);
+    return ["cost-asc", "cost-desc", "name"].includes(sort) ? sort : "cost-asc";
+  }
+
   function getHelperPanelWidth() {
     return clampHelperPanelWidth(localStorage.getItem(HELPER_PANEL_WIDTH_STORAGE_KEY) || HELPER_PANEL_WIDTH);
   }
@@ -152,6 +157,13 @@
     localStorage.setItem(QUICK_BOMB_AMMO_STORAGE_KEY, String(value));
     setStatus(`quick bomb ammo set to ${value}`);
     renderStatusPanel();
+    renderQuickBombPanel();
+  }
+
+  function setQuickBombItemSort(sort) {
+    const value = ["cost-asc", "cost-desc", "name"].includes(sort) ? sort : "cost-asc";
+    localStorage.setItem(QUICK_BOMB_ITEM_SORT_STORAGE_KEY, value);
+    setStatus(`quick bomb item sort set to ${value}`);
     renderQuickBombPanel();
   }
 

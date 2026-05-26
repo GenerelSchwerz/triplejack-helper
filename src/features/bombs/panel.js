@@ -60,7 +60,14 @@
             <div data-tj-helper-quick-bomb-status style="margin-top:6px;color:#8FB8C4;font-size:11px;"></div>
           </section>
           <section style="border:1px solid rgba(191,231,241,.2);border-radius:6px;padding:10px;background:rgba(255,255,255,.025);">
-            <div style="margin-bottom:8px;color:#E9F7FA;font-weight:700;">Items</div>
+            <div style="display:grid;grid-template-columns:minmax(0,1fr) 112px;gap:8px;align-items:center;margin-bottom:8px;">
+              <div style="color:#E9F7FA;font-weight:700;">Items</div>
+              <select data-tj-helper-quick-bomb-item-sort style="min-width:0;background:#DDEAF2;color:#111;border:1px solid #74A7B9;border-radius:4px;padding:4px;">
+                <option value="cost-asc">Cost ↑</option>
+                <option value="cost-desc">Cost ↓</option>
+                <option value="name">Name</option>
+              </select>
+            </div>
             <div data-tj-helper-quick-bomb-items style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;"></div>
           </section>
           <section style="border:1px solid rgba(191,231,241,.2);border-radius:6px;padding:10px;background:rgba(255,255,255,.025);">
@@ -87,6 +94,9 @@
       });
       quickBombPanel.querySelector("[data-tj-helper-quick-bomb-ammo]").addEventListener("change", (event) => {
         setQuickBombAmmo(event.target.value);
+      });
+      quickBombPanel.querySelector("[data-tj-helper-quick-bomb-item-sort]").addEventListener("change", (event) => {
+        setQuickBombItemSort(event.target.value);
       });
       quickBombPanel.querySelector("[data-tj-helper-quick-bomb-start]").addEventListener("click", () => {
         sendQuickBombControl("start");
@@ -137,6 +147,7 @@
     const startButton = quickBombPanel.querySelector("[data-tj-helper-quick-bomb-start]");
     const stopButton = quickBombPanel.querySelector("[data-tj-helper-quick-bomb-stop]");
     const statusElement = quickBombPanel.querySelector("[data-tj-helper-quick-bomb-status]");
+    const itemSortSelect = quickBombPanel.querySelector("[data-tj-helper-quick-bomb-item-sort]");
     const itemsElement = quickBombPanel.querySelector("[data-tj-helper-quick-bomb-items]");
     const targetsElement = quickBombPanel.querySelector("[data-tj-helper-quick-bomb-targets]");
 
@@ -150,6 +161,7 @@
     durationLabel.style.display = getQuickBombMode() === "duration" ? "" : "none";
     ammoInput.style.display = getQuickBombMode() === "ammo" ? "" : "none";
     ammoLabel.style.display = getQuickBombMode() === "ammo" ? "" : "none";
+    itemSortSelect.value = getQuickBombItemSort();
 
     const players = Array.isArray(state.quickBombPlayers) ? state.quickBombPlayers : [];
     const selectedTarget = players.find((player) => player.playerId === state.quickBombSelectedPlayerId);
@@ -172,7 +184,7 @@
   }
 
   function renderQuickBombItems(itemsElement) {
-    const items = Array.isArray(state.quickBombItems) ? state.quickBombItems : [];
+    const items = sortQuickBombItems(Array.isArray(state.quickBombItems) ? state.quickBombItems : []);
     const selectedItem = state.quickBombSelectedItem || state.quickBombLastItem;
     if (!items.length) {
       itemsElement.innerHTML = `<div style="grid-column:1/-1;color:#8FB8C4;">Waiting for item definitions.</div>`;
@@ -195,6 +207,25 @@
         `;
       })
       .join("");
+  }
+
+  function sortQuickBombItems(items) {
+    const sort = getQuickBombItemSort();
+    return [...items].sort((a, b) => {
+      if (sort === "cost-asc") {
+        return Number(a.cost || 0) - Number(b.cost || 0) || compareQuickBombItemNames(a, b);
+      }
+
+      if (sort === "cost-desc") {
+        return Number(b.cost || 0) - Number(a.cost || 0) || compareQuickBombItemNames(a, b);
+      }
+
+      return compareQuickBombItemNames(a, b);
+    });
+  }
+
+  function compareQuickBombItemNames(a, b) {
+    return String(a.label || a.itemKey).localeCompare(String(b.label || b.itemKey));
   }
 
   function renderQuickBombTargets(targetsElement) {

@@ -12,6 +12,7 @@
   const QUICK_BOMB_MODE_STORAGE_KEY = "triplejack-helper-quick-bomb-mode";
   const QUICK_BOMB_DURATION_STORAGE_KEY = "triplejack-helper-quick-bomb-duration";
   const QUICK_BOMB_AMMO_STORAGE_KEY = "triplejack-helper-quick-bomb-ammo";
+  const QUICK_BOMB_ITEM_SORT_STORAGE_KEY = "triplejack-helper-quick-bomb-item-sort";
   const HELPER_PANEL_WIDTH_STORAGE_KEY = "triplejack-helper-panel-width";
   const HELPER_PANEL_WIDTH_ENABLED_STORAGE_KEY = "triplejack-helper-panel-width-enabled";
   const PANEL_TOGGLE_KEY = "L";

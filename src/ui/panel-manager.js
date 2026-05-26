@@ -223,7 +223,7 @@
       return;
     }
 
-    if (panelContainer.children.length && getActiveNativePanelButton()) {
+    if (panelContainer.children.length) {
       return;
     }
 
@@ -824,8 +824,12 @@
   }
 
   function getActiveNativePanelButton() {
-    return document.querySelector(
-      'button[data-testid="panel button"][data-is-active="true"]:not([data-tj-helper-toolbar-button])',
+    return (
+      document.querySelector('button[data-testid="panel button"][data-is-active="true"]:not([data-tj-helper-toolbar-button])') ||
+      [...document.querySelectorAll('button[data-testid="panel button"]:not([data-tj-helper-toolbar-button])')].find(
+        isNativePanelButtonActive,
+      ) ||
+      null
     );
   }
 

@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Triplejack Helper
 // @namespace    https://triplejack.com/
-// @version      0.8.41
+// @version      0.8.42
 // @description  Adds Triplejack chat translation, message tools, and session tracking helpers.
 // @author       Rocco A.
 // @license      MIT
@@ -1882,7 +1882,7 @@
       return;
     }
 
-    if (panelContainer.children.length && getActiveNativePanelButton()) {
+    if (panelContainer.children.length) {
       return;
     }
 
@@ -2483,8 +2483,12 @@
   }
 
   function getActiveNativePanelButton() {
-    return document.querySelector(
-      'button[data-testid="panel button"][data-is-active="true"]:not([data-tj-helper-toolbar-button])',
+    return (
+      document.querySelector('button[data-testid="panel button"][data-is-active="true"]:not([data-tj-helper-toolbar-button])') ||
+      [...document.querySelectorAll('button[data-testid="panel button"]:not([data-tj-helper-toolbar-button])')].find(
+        isNativePanelButtonActive,
+      ) ||
+      null
     );
   }
 

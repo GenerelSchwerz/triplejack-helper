@@ -32,8 +32,8 @@
         <div style="display:grid;gap:10px;">
           <section style="border:1px solid rgba(191,231,241,.2);border-radius:6px;padding:10px;background:rgba(255,255,255,.025);">
             <div style="margin-bottom:8px;color:#E9F7FA;font-weight:700;">Translation</div>
-            <div style="display:grid;grid-template-columns:94px minmax(0,1fr) 72px;gap:6px;align-items:center;margin-bottom:8px;">
-              <label style="color:#BFE7F1;">Incoming</label>
+            <div style="display:grid;grid-template-columns:minmax(0,1fr) 72px;gap:6px;align-items:center;margin-bottom:8px;">
+              <label style="grid-column:1/-1;color:#BFE7F1;">Translate incoming messages to insert language here.</label>
               <select data-tj-helper-language style="min-width:0;background:#DDEAF2;color:#111;border:1px solid #74A7B9;border-radius:4px;padding:4px;"></select>
               <input data-tj-helper-custom-language style="min-width:0;background:#DDEAF2;color:#111;border:1px solid #74A7B9;border-radius:4px;padding:4px;" />
             </div>
@@ -41,10 +41,13 @@
               <input data-tj-helper-outgoing-enabled type="checkbox" style="margin:0;" />
               Translate sent messages
             </label>
-            <div style="display:grid;grid-template-columns:94px minmax(0,1fr) 72px;gap:6px;align-items:center;">
-              <label style="color:#BFE7F1;">Outgoing</label>
+            <div style="display:grid;grid-template-columns:minmax(0,1fr) 72px;gap:6px;align-items:center;">
+              <label style="grid-column:1/-1;color:#BFE7F1;">Translate outgoing messages to translate message here.</label>
               <select data-tj-helper-outgoing-language style="min-width:0;background:#DDEAF2;color:#111;border:1px solid #74A7B9;border-radius:4px;padding:4px;"></select>
               <input data-tj-helper-custom-outgoing-language style="min-width:0;background:#DDEAF2;color:#111;border:1px solid #74A7B9;border-radius:4px;padding:4px;" />
+            </div>
+            <div style="margin-top:8px;color:#8FB8C4;font-size:11px;">
+              Made by Rocco A. &middot; <a href="https://github.com/GenerelSchwerz/triplejack-helper/blob/main/reference/messed-up-page.html" target="_blank" rel="noopener noreferrer" style="color:#BFE7F1;">Reference page</a>
             </div>
           </section>
           <section style="border:1px solid rgba(191,231,241,.2);border-radius:6px;padding:10px;background:rgba(255,255,255,.025);">

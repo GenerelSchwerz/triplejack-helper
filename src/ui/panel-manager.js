@@ -222,7 +222,7 @@
       return;
     }
 
-    if (panelContainer.children.length) {
+    if (panelContainer.children.length && getActiveNativePanelButton()) {
       return;
     }
 

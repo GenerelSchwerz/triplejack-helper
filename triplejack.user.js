@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Triplejack Helper
 // @namespace    https://triplejack.com/
-// @version      0.8.43
+// @version      0.8.44
 // @description  Adds Triplejack chat translation, message tools, and session tracking helpers.
 // @author       Rocco A.
 // @license      MIT
@@ -4206,10 +4206,8 @@
     return `
       <div style="${getHistoryRoomRowStyle()}">
         <span style="${getHistoryRoomLabelStyle()}" title="${escapeHistoryAttribute(roomStats.roomType)}">${escapeHistoryHtml(roomStats.roomType)}</span>
-        <span style="${getHistoryRoomMetricsStyle()}">
-          <span style="${getHistoryRowMutedValueStyle()}">${roomStats.sessions} ses</span>
-          <strong style="${getHistoryRowMetricStyle(getHistoryStatColor(roomStats.bigBlindDelta))}">${formatHistorySigned(roomStats.bigBlindsPerHour)}/h</strong>
-        </span>
+        <span style="${getHistoryRowMutedValueStyle()}">${roomStats.sessions} ses</span>
+        <strong style="${getHistoryRowMetricStyle(getHistoryStatColor(roomStats.bigBlindDelta))}">${formatHistorySigned(roomStats.bigBlindsPerHour)}/h</strong>
       </div>
     `;
   }
@@ -4251,7 +4249,7 @@
   }
 
   function getHistorySplitGridStyle() {
-    return "display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:12px;margin-bottom:12px;";
+    return "display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,360px),1fr));gap:12px;margin-bottom:12px;";
   }
 
   function getHistorySectionStyle() {
@@ -4267,7 +4265,7 @@
   }
 
   function getHistoryRoomRowStyle() {
-    return "display:flex;flex-wrap:wrap;gap:4px 10px;align-items:center;min-width:0;overflow:visible;";
+    return "display:grid;grid-template-columns:minmax(max-content,1fr) minmax(34px,auto) minmax(62px,auto);gap:6px;align-items:center;min-width:0;";
   }
 
   function getHistorySessionRowStyle() {
@@ -4279,11 +4277,7 @@
   }
 
   function getHistoryRoomLabelStyle() {
-    return "flex:0 0 auto;max-width:100%;overflow:visible;white-space:nowrap;";
-  }
-
-  function getHistoryRoomMetricsStyle() {
-    return "display:flex;gap:10px;align-items:center;justify-content:flex-end;flex:0 0 auto;margin-left:auto;white-space:nowrap;";
+    return "min-width:0;overflow:visible;white-space:nowrap;";
   }
 
   function getHistoryRowMutedValueStyle() {

@@ -37,7 +37,7 @@
             </label>
             <div style="display:grid;grid-template-columns:minmax(0,1fr) 68px;gap:6px;align-items:center;margin-top:8px;color:#BFE7F1;">
               <label>Per second</label>
-              <input data-tj-helper-quick-bomb-rate type="number" step="1" style="min-width:0;background:#DDEAF2;color:#111;border:1px solid #74A7B9;border-radius:4px;padding:4px;" />
+              <input data-tj-helper-quick-bomb-rate type="number" step="any" style="min-width:0;background:#DDEAF2;color:#111;border:1px solid #74A7B9;border-radius:4px;padding:4px;" />
               <label>Speed</label>
               <select data-tj-helper-quick-bomb-speed-mode style="min-width:0;background:#DDEAF2;color:#111;border:1px solid #74A7B9;border-radius:4px;padding:4px;">
                 <option value="timed">Timed</option>
@@ -77,11 +77,28 @@
         </div>
       `;
 
+      let previousRateValue = null;
       quickBombPanel.querySelector("[data-tj-helper-quick-bomb-enabled]").addEventListener("change", (event) => {
         setQuickBombEnabled(event.target.checked);
       });
-      quickBombPanel.querySelector("[data-tj-helper-quick-bomb-rate]").addEventListener("change", (event) => {
+      const rateInput = quickBombPanel.querySelector("[data-tj-helper-quick-bomb-rate]");
+      rateInput.addEventListener("change", (event) => {
+        const newValue = parseFloat(event.target.value);
+        if (previousRateValue !== null) {
+          const diff = Math.abs(newValue - previousRateValue);
+          if (Math.abs(diff - 1) < 0.01) {
+            const roundedValue = Math.round(newValue);
+            event.target.value = String(roundedValue);
+            setQuickBombRate(roundedValue);
+            previousRateValue = roundedValue;
+            return;
+          }
+        }
         setQuickBombRate(event.target.value);
+        previousRateValue = newValue;
+      });
+      rateInput.addEventListener("input", (event) => {
+        previousRateValue = parseFloat(event.target.value);
       });
       quickBombPanel.querySelector("[data-tj-helper-quick-bomb-speed-mode]").addEventListener("change", (event) => {
         setQuickBombSpeedMode(event.target.value);

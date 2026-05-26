@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Triplejack Helper
 // @namespace    https://triplejack.com/
-// @version      0.8.48
+// @version      0.8.49
 // @description  Adds Triplejack chat translation, message tools, and session tracking helpers.
 // @author       Rocco A.
 // @license      MIT
@@ -5152,33 +5152,43 @@
               <span>Bomb spammer</span>
               <input data-tj-helper-quick-bomb-enabled type="checkbox" style="margin:0;" />
             </label>
-            <div style="display:grid;grid-template-columns:minmax(0,1fr) 68px;gap:6px;align-items:center;margin-top:8px;color:#BFE7F1;">
-              <label>Per ten seconds</label>
-              <input data-tj-helper-quick-bomb-rate type="number" step="any" min="1" max="1000" style="min-width:0;background:#DDEAF2;color:#111;border:1px solid #74A7B9;border-radius:4px;padding:4px;" />
-              <label>Speed</label>
-              <select data-tj-helper-quick-bomb-speed-mode style="min-width:0;background:#DDEAF2;color:#111;border:1px solid #74A7B9;border-radius:4px;padding:4px;">
-                <option value="timed">Timed</option>
-                <option value="instant">Instant</option>
-              </select>
-              <label>Limit</label>
-              <select data-tj-helper-quick-bomb-mode style="min-width:0;background:#DDEAF2;color:#111;border:1px solid #74A7B9;border-radius:4px;padding:4px;">
-                <option value="duration">Duration</option>
-                <option value="ammo">Ammo</option>
-              </select>
-              <label data-tj-helper-quick-bomb-duration-label>Seconds</label>
-              <input data-tj-helper-quick-bomb-duration type="number" step="1" style="min-width:0;background:#DDEAF2;color:#111;border:1px solid #74A7B9;border-radius:4px;padding:4px;" />
-              <label data-tj-helper-quick-bomb-ammo-label>Ammo</label>
-              <div data-tj-helper-quick-bomb-ammo-controls style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:4px;min-width:0;">
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:8px;align-items:end;margin-top:10px;color:#BFE7F1;">
+              <label style="${getQuickBombFieldStyle()}">
+                <span>Per ten seconds</span>
+                <input data-tj-helper-quick-bomb-rate type="number" step="any" min="1" max="1000" style="${getQuickBombInputStyle()}" />
+              </label>
+              <label style="${getQuickBombFieldStyle()}">
+                <span>Speed</span>
+                <select data-tj-helper-quick-bomb-speed-mode style="${getQuickBombInputStyle()}">
+                  <option value="timed">Timed</option>
+                  <option value="instant">Instant</option>
+                </select>
+              </label>
+              <label style="${getQuickBombFieldStyle()}">
+                <span>Limit</span>
+                <select data-tj-helper-quick-bomb-mode style="${getQuickBombInputStyle()}">
+                  <option value="duration">Duration</option>
+                  <option value="ammo">Ammo</option>
+                </select>
+              </label>
+              <label data-tj-helper-quick-bomb-duration-label style="${getQuickBombFieldStyle()}">
+                <span>Seconds</span>
+                <input data-tj-helper-quick-bomb-duration type="number" step="1" style="${getQuickBombInputStyle()}" />
+              </label>
+              <div data-tj-helper-quick-bomb-ammo-label style="${getQuickBombFieldStyle()}">
+                <span>Ammo</span>
+                <div data-tj-helper-quick-bomb-ammo-controls style="display:grid;grid-template-columns:repeat(5,minmax(0,auto));gap:4px;min-width:0;">
                 <button data-tj-helper-quick-bomb-ammo-step="-100" type="button" style="${getQuickBombSmallButtonStyle()}">-100</button>
                 <button data-tj-helper-quick-bomb-ammo-step="-10" type="button" style="${getQuickBombSmallButtonStyle()}">-10</button>
-                <input data-tj-helper-quick-bomb-ammo type="number" step="1" style="grid-column:1/-1;min-width:0;background:#DDEAF2;color:#111;border:1px solid #74A7B9;border-radius:4px;padding:4px;" />
+                <input data-tj-helper-quick-bomb-ammo type="number" step="1" style="${getQuickBombInputStyle()}width:68px;" />
                 <button data-tj-helper-quick-bomb-ammo-step="10" type="button" style="${getQuickBombSmallButtonStyle()}">+10</button>
                 <button data-tj-helper-quick-bomb-ammo-step="100" type="button" style="${getQuickBombSmallButtonStyle()}">+100</button>
+                </div>
               </div>
             </div>
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:8px;">
-              <button data-tj-helper-quick-bomb-start type="button" style="background:#7ED6C4;color:#0B1B20;border:0;border-radius:4px;padding:5px 8px;font-weight:700;">Start</button>
-              <button data-tj-helper-quick-bomb-stop type="button" style="background:#DDEAF2;color:#0B1B20;border:0;border-radius:4px;padding:5px 8px;font-weight:700;">Stop</button>
+            <div style="display:flex;flex-wrap:wrap;gap:6px;justify-content:flex-end;margin-top:10px;">
+              <button data-tj-helper-quick-bomb-start type="button" style="${getQuickBombActionButtonStyle("#7ED6C4")}">Start</button>
+              <button data-tj-helper-quick-bomb-stop type="button" style="${getQuickBombActionButtonStyle("#DDEAF2")}">Stop</button>
             </div>
             <div data-tj-helper-quick-bomb-status style="margin-top:6px;color:#8FB8C4;font-size:11px;"></div>
           </section>
@@ -5382,8 +5392,20 @@
     return String(a.label || a.itemKey).localeCompare(String(b.label || b.itemKey));
   }
 
+  function getQuickBombFieldStyle() {
+    return "display:grid;gap:4px;min-width:0;color:#BFE7F1;";
+  }
+
+  function getQuickBombInputStyle() {
+    return "width:100%;min-width:0;box-sizing:border-box;background:#DDEAF2;color:#111;border:1px solid #74A7B9;border-radius:4px;padding:4px;";
+  }
+
   function getQuickBombSmallButtonStyle() {
-    return "min-width:0;background:rgba(191,231,241,.12);color:#BFE7F1;border:1px solid rgba(191,231,241,.36);border-radius:4px;padding:3px 4px;font:11px/1.1 Arial,sans-serif;font-weight:700;cursor:pointer;";
+    return "min-width:0;background:rgba(191,231,241,.12);color:#BFE7F1;border:1px solid rgba(191,231,241,.36);border-radius:4px;padding:5px 6px;font:11px/1.1 Arial,sans-serif;font-weight:700;cursor:pointer;";
+  }
+
+  function getQuickBombActionButtonStyle(background) {
+    return `min-width:104px;background:${background};color:#0B1B20;border:0;border-radius:4px;padding:6px 12px;font-weight:700;cursor:pointer;`;
   }
 
   function renderQuickBombTargets(targetsElement) {

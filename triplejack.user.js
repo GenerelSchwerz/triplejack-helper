@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Triplejack Helper
 // @namespace    https://triplejack.com/
-// @version      0.8.36
+// @version      0.8.37
 // @description  Adds Triplejack chat translation, message tools, and session tracking helpers.
 // @author       Rocco A.
 // @license      MIT
@@ -2023,7 +2023,7 @@
 
     const panelContainer = document.querySelector('[data-testid="panel-container"]');
     const panelRegion = panelContainer?.parentElement;
-    const hasPanel = Boolean(panelContainer && panelRegion && panelRegion.offsetParent !== null && hasHelperPanelOpen());
+    const hasPanel = Boolean(panelContainer && panelRegion && panelRegion.offsetParent !== null);
     resizeHandle.style.display = hasPanel ? "flex" : "none";
     if (hasPanel) {
       positionHelperPanelResizeHandle(panelRegion);
@@ -2078,6 +2078,7 @@
       clearNativeStageWidthStyle();
       if (panelContainer.dataset.tjHelperPanelContainer || panelRegion.dataset.tjHelperPanelRegion) {
         activateHelperPanelSizing(HELPER_PANEL_WIDTH);
+        setPanelSiblingWidthStyle(panelRegion, HELPER_PANEL_WIDTH);
         setPanelRegionWidthStyle(panelRegion, HELPER_PANEL_WIDTH);
         setPanelContainerWidthStyle(panelContainer, HELPER_PANEL_WIDTH);
         setNativeStageWidthStyle(HELPER_PANEL_WIDTH);
@@ -2089,6 +2090,7 @@
     const panelWidth = getResolvedHelperPanelWidth();
     activateHelperPanelSizing(panelWidth);
     setNativeStageWidthStyle(panelWidth);
+    setPanelSiblingWidthStyle(panelRegion, panelWidth);
     setPanelRegionWidthStyle(panelRegion, panelWidth);
     setPanelContainerWidthStyle(panelContainer, panelWidth);
     for (const child of panelContainer.children) {
@@ -2195,7 +2197,7 @@
   }
 
   function deactivateHelperPanelSizingIfClosed() {
-    if (hasHelperPanelOpen()) {
+    if (hasOpenPanel()) {
       return;
     }
 
@@ -2217,7 +2219,7 @@
   }
 
   function reconcileHelperPanelSizingState() {
-    if (hasHelperPanelOpen()) {
+    if (hasOpenPanel()) {
       syncHelperPanelResizeHandle();
       return;
     }
@@ -2225,12 +2227,14 @@
     collapsePanelShellImmediately();
   }
 
-  function hasHelperPanelOpen() {
-    return Boolean(
-      state.activePanelId ||
-        helperPanelHost?.isConnected ||
-        document.querySelector("[data-tj-helper-panel-wrapper]"),
-    );
+  function prepareHelperPanelWidthBeforeOpen() {
+    const panelWidth = getResolvedHelperPanelWidth();
+    activateHelperPanelSizing(panelWidth);
+    setNativeStageWidthStyle(panelWidth);
+  }
+
+  function hasOpenPanel() {
+    return Boolean(state.activePanelId || getActiveNativePanelButton());
   }
 
   function clearPanelWidthStyle(element) {
@@ -2271,6 +2275,23 @@
     }
   }
 
+  function setPanelSiblingWidthStyle(panelRegion, panelWidth) {
+    const sibling = panelRegion?.previousElementSibling;
+    if (!sibling?.style || sibling.matches?.('[data-testid="poker-stage-container"]')) {
+      return;
+    }
+
+    const parent = panelRegion.parentElement;
+    parent?.style?.setProperty("min-width", "0", "important");
+    parent?.style?.setProperty("overflow", "hidden", "important");
+    sibling.style.setProperty("flex", "1 1 0", "important");
+    sibling.style.setProperty("flex-basis", "0", "important");
+    sibling.style.setProperty("width", `calc(100% - ${panelWidth}px)`, "important");
+    sibling.style.setProperty("min-width", "0", "important");
+    sibling.style.setProperty("max-width", `calc(100% - ${panelWidth}px)`, "important");
+    sibling.style.setProperty("overflow", "hidden", "important");
+  }
+
   function clearNativeStageWidthStyle() {
     for (const stageContainer of document.querySelectorAll('[data-testid="poker-stage-container"]')) {
       const sceneRow = stageContainer.parentElement;
@@ -2288,14 +2309,32 @@
     }
   }
 
+  function clearPanelSiblingWidthStyle(panelContainer = document.querySelector('[data-testid="panel-container"]')) {
+    const panelRegion = panelContainer?.parentElement;
+    const sibling = panelRegion?.previousElementSibling;
+    if (!sibling?.style || sibling.matches?.('[data-testid="poker-stage-container"]')) {
+      return;
+    }
+
+    const parent = panelRegion.parentElement;
+    if (parent?.style) {
+      parent.style.removeProperty("overflow");
+      parent.style.removeProperty("min-width");
+    }
+    for (const property of ["flex", "flex-basis", "width", "min-width", "max-width", "overflow"]) {
+      sibling.style.removeProperty(property);
+    }
+  }
+
   function clearHelperPanelLayoutOverrides(panelContainer = document.querySelector('[data-testid="panel-container"]')) {
+    clearPanelSiblingWidthStyle(panelContainer);
     clearHelperPanelWidth(panelContainer);
     clearNativeStageWidthStyle();
   }
 
   function scheduleHelperPanelCloseCleanup() {
     const cleanup = () => {
-      if (!hasHelperPanelOpen()) {
+      if (!hasOpenPanel()) {
         collapsePanelShellImmediately();
         return;
       }
@@ -2317,21 +2356,11 @@
     document.documentElement?.removeAttribute("data-tj-helper-panel-sizing-active");
     document.documentElement?.style.removeProperty("--tj-helper-panel-width");
 
-    const activeNativePanelButton = getActiveNativePanelButton();
-    if (panelRegion && (panelContainer?.dataset.tjHelperPanelContainer || panelRegion.dataset.tjHelperPanelRegion)) {
+    if (panelRegion) {
       panelRegion.style.display = "none";
       panelRegion.dataset.tjHelperHiddenEmpty = "1";
-      panelContainer.dataset.tjHelperHiddenEmpty = "1";
-    } else if (panelContainer && activeNativePanelButton) {
-      panelRegion?.style.removeProperty("display");
-      delete panelRegion?.dataset.tjHelperHiddenEmpty;
-      panelContainer.style.removeProperty("display");
-      delete panelContainer.dataset.tjHelperHiddenEmpty;
-    } else if (panelContainer && !panelContainer.children.length) {
-      if (panelRegion) {
-        panelRegion.style.display = "none";
-        panelRegion.dataset.tjHelperHiddenEmpty = "1";
-      }
+    }
+    if (panelContainer) {
       panelContainer.dataset.tjHelperHiddenEmpty = "1";
     }
 
@@ -2360,7 +2389,8 @@
   function scheduleNativePanelWidthApply() {
     const refresh = () => {
       const panelContainer = document.querySelector('[data-testid="panel-container"]');
-      if (!hasHelperPanelOpen() && !panelContainer?.dataset.tjHelperPanelContainer) {
+      const activeNativePanelButton = getActiveNativePanelButton();
+      if (!state.activePanelId && !activeNativePanelButton && !panelContainer?.dataset.tjHelperPanelContainer) {
         collapsePanelShellImmediately();
         return;
       }
@@ -2398,7 +2428,7 @@
       return;
     }
 
-    if (!state.activePanelId) {
+    if (!state.activePanelId && isNativePanelButtonActive(nativePanelButton)) {
       collapsePanelShellImmediately();
       window.setTimeout(() => {
         deactivateHelperPanelSizingIfClosed();
@@ -2410,6 +2440,10 @@
 
     ensureHelperPanelResizeHandle();
     scheduleNativePanelWidthApply();
+
+    if (!state.activePanelId) {
+      return;
+    }
 
     logPanelDebug("native-panel-pointerdown-switches-from-helper", {
       activePanelId: state.activePanelId,
@@ -2537,7 +2571,7 @@
   }
 
   function syncNativePanelGeometry() {
-    const panelContainer = hasHelperPanelOpen() ? document.querySelector('[data-testid="panel-container"]') : null;
+    const panelContainer = hasOpenPanel() ? document.querySelector('[data-testid="panel-container"]') : null;
     const panelRegion = panelContainer?.parentElement;
     if (!panelContainer || !panelRegion) {
       return;
@@ -2581,7 +2615,7 @@
       }
 
       const sceneRow = stageContainer.parentElement;
-      const panelRegion = hasHelperPanelOpen()
+      const panelRegion = hasOpenPanel()
         ? [...(sceneRow?.children || [])].find((child) => child.querySelector?.('[data-testid="panel-container"]'))
         : null;
       const panelWidth = Math.round(panelRegion?.getBoundingClientRect?.().width || 0);

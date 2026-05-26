@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Triplejack Helper
 // @namespace    https://triplejack.com/
-// @version      0.8.29
+// @version      0.8.30
 // @description  Adds Triplejack chat translation, message tools, and session tracking helpers.
 // @author       Rocco A.
 // @license      MIT
@@ -5287,9 +5287,9 @@
           state.quickBombActive ? ` | remaining ${state.quickBombRemaining || 0}` : ""
         }`
       : "Select an item or throw one bomb.";
-
-    renderQuickBombItems(itemsElement);
     renderQuickBombTargets(targetsElement);
+    renderQuickBombItems(itemsElement);
+
   }
 
   function renderQuickBombItems(itemsElement) {

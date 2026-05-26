@@ -121,11 +121,6 @@
     }
 
     function startSpam() {
-      if (!isQuickBombEnabled()) {
-        setStatus("quick bomb disabled");
-        return;
-      }
-
       if (!getSelectedItemKey() || typeof state.nativeSend !== "function") {
         setStatus("quick bomb needs an item and websocket sender");
         return;
@@ -167,11 +162,6 @@
 
     function sendNextBomb() {
       if (!state.active) {
-        return;
-      }
-
-      if (!isQuickBombEnabled()) {
-        stopSpam("quick bomb disabled");
         return;
       }
 
@@ -610,10 +600,6 @@
         !event.metaKey &&
         event.key.toUpperCase() === config.hotkey
       );
-    }
-
-    function isQuickBombEnabled() {
-      return window.localStorage?.getItem(config.enabledStorageKey) !== "0";
     }
 
     function getRate() {

@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Triplejack Helper
 // @namespace    https://triplejack.com/
-// @version      0.8.50
+// @version      0.8.51
 // @description  Adds Triplejack chat translation, message tools, and session tracking helpers.
 // @author       Rocco A.
 // @license      MIT
@@ -721,11 +721,6 @@
     }
 
     function startSpam() {
-      if (!isQuickBombEnabled()) {
-        setStatus("quick bomb disabled");
-        return;
-      }
-
       if (!getSelectedItemKey() || typeof state.nativeSend !== "function") {
         setStatus("quick bomb needs an item and websocket sender");
         return;
@@ -767,11 +762,6 @@
 
     function sendNextBomb() {
       if (!state.active) {
-        return;
-      }
-
-      if (!isQuickBombEnabled()) {
-        stopSpam("quick bomb disabled");
         return;
       }
 
@@ -1210,10 +1200,6 @@
         !event.metaKey &&
         event.key.toUpperCase() === config.hotkey
       );
-    }
-
-    function isQuickBombEnabled() {
-      return window.localStorage?.getItem(config.enabledStorageKey) !== "0";
     }
 
     function getRate() {
@@ -5148,10 +5134,7 @@
         </div>
         <div style="display:grid;gap:10px;">
           <section style="border:1px solid rgba(191,231,241,.2);border-radius:6px;padding:10px;background:rgba(255,255,255,.025);">
-            <label style="display:flex;align-items:center;justify-content:space-between;gap:12px;color:#BFE7F1;">
-              <span>Bomb spammer</span>
-              <input data-tj-helper-quick-bomb-enabled type="checkbox" style="margin:0;" />
-            </label>
+            <div style="color:#BFE7F1;font-weight:700;">Bomb spammer</div>
             <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:8px;align-items:end;margin-top:10px;color:#BFE7F1;">
               <label style="${getQuickBombFieldStyle()}">
                 <span>Per ten seconds</span>
@@ -5175,15 +5158,15 @@
                 <span>Seconds</span>
                 <input data-tj-helper-quick-bomb-duration type="number" step="1" style="${getQuickBombInputStyle()}" />
               </label>
-              <div data-tj-helper-quick-bomb-ammo-label style="${getQuickBombFieldStyle()}">
-                <span>Ammo</span>
-                <div data-tj-helper-quick-bomb-ammo-controls style="display:grid;grid-template-columns:repeat(5,minmax(0,auto));gap:4px;min-width:0;">
+            </div>
+            <div data-tj-helper-quick-bomb-ammo-label style="${getQuickBombFieldStyle()}margin-top:8px;">
+              <span>Ammo</span>
+              <div data-tj-helper-quick-bomb-ammo-controls style="display:grid;grid-template-columns:minmax(48px,auto) minmax(42px,auto) minmax(72px,1fr) minmax(42px,auto) minmax(48px,auto);gap:6px;min-width:0;align-items:center;">
                 <button data-tj-helper-quick-bomb-ammo-step="-100" type="button" style="${getQuickBombSmallButtonStyle()}">-100</button>
                 <button data-tj-helper-quick-bomb-ammo-step="-10" type="button" style="${getQuickBombSmallButtonStyle()}">-10</button>
-                <input data-tj-helper-quick-bomb-ammo type="number" step="1" style="${getQuickBombInputStyle()}width:68px;" />
+                <input data-tj-helper-quick-bomb-ammo type="number" step="1" style="${getQuickBombInputStyle()}" />
                 <button data-tj-helper-quick-bomb-ammo-step="10" type="button" style="${getQuickBombSmallButtonStyle()}">+10</button>
                 <button data-tj-helper-quick-bomb-ammo-step="100" type="button" style="${getQuickBombSmallButtonStyle()}">+100</button>
-                </div>
               </div>
             </div>
             <div style="display:flex;flex-wrap:wrap;gap:6px;justify-content:flex-end;margin-top:10px;">
@@ -5211,9 +5194,6 @@
       `;
 
       let previousRateValue = null;
-      quickBombPanel.querySelector("[data-tj-helper-quick-bomb-enabled]").addEventListener("change", (event) => {
-        setQuickBombEnabled(event.target.checked);
-      });
       const rateInput = quickBombPanel.querySelector("[data-tj-helper-quick-bomb-rate]");
       rateInput.addEventListener("change", (event) => {
         const newValue = parseFloat(event.target.value);
@@ -5299,7 +5279,6 @@
   }
 
   function refreshQuickBombPanel() {
-    const enabledInput = quickBombPanel.querySelector("[data-tj-helper-quick-bomb-enabled]");
     const rateInput = quickBombPanel.querySelector("[data-tj-helper-quick-bomb-rate]");
     const speedModeSelect = quickBombPanel.querySelector("[data-tj-helper-quick-bomb-speed-mode]");
     const modeSelect = quickBombPanel.querySelector("[data-tj-helper-quick-bomb-mode]");
@@ -5315,7 +5294,6 @@
     const itemsElement = quickBombPanel.querySelector("[data-tj-helper-quick-bomb-items]");
     const targetsElement = quickBombPanel.querySelector("[data-tj-helper-quick-bomb-targets]");
 
-    enabledInput.checked = getQuickBombEnabled();
     rateInput.value = String(getQuickBombRate());
     speedModeSelect.value = getQuickBombSpeedMode();
     modeSelect.value = getQuickBombMode();
@@ -5331,7 +5309,7 @@
     const selectedTarget = players.find((player) => player.playerId === state.quickBombSelectedPlayerId);
     const hasTarget = Boolean(selectedTarget?.playerName);
     const hasItem = Boolean(state.quickBombSelectedItem || state.quickBombLastItem);
-    const canStart = state.quickBombInRoom && hasTarget && hasItem && getQuickBombEnabled() && !state.quickBombActive;
+    const canStart = state.quickBombInRoom && hasTarget && hasItem && !state.quickBombActive;
     startButton.disabled = !canStart;
     stopButton.disabled = !state.quickBombActive;
     startButton.style.opacity = startButton.disabled ? ".5" : "1";
@@ -5401,7 +5379,7 @@
   }
 
   function getQuickBombSmallButtonStyle() {
-    return "min-width:0;background:rgba(191,231,241,.12);color:#BFE7F1;border:1px solid rgba(191,231,241,.36);border-radius:4px;padding:5px 6px;font:11px/1.1 Arial,sans-serif;font-weight:700;cursor:pointer;";
+    return "min-width:42px;white-space:nowrap;text-align:center;background:rgba(191,231,241,.12);color:#BFE7F1;border:1px solid rgba(191,231,241,.36);border-radius:4px;padding:6px 8px;font:11px/1.1 Arial,sans-serif;font-weight:700;cursor:pointer;";
   }
 
   function getQuickBombActionButtonStyle(background) {

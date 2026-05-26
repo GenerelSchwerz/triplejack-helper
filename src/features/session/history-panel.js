@@ -531,7 +531,7 @@
   }
 
   function getHistorySplitGridStyle() {
-    return "display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,320px),1fr));gap:12px;margin-bottom:12px;";
+    return "display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,48ch),1fr));gap:12px;margin-bottom:12px;";
   }
 
   function getHistorySectionStyle() {
@@ -547,7 +547,7 @@
   }
 
   function getHistoryRoomRowStyle() {
-    return "display:grid;grid-template-columns:minmax(max-content,1fr) minmax(34px,auto) minmax(62px,auto);gap:6px;align-items:center;min-width:0;";
+    return "display:grid;grid-template-columns:minmax(max-content,1fr) max-content max-content;gap:6px;align-items:center;min-width:0;";
   }
 
   function getHistorySessionRowStyle() {

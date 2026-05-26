@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Triplejack Helper
 // @namespace    https://triplejack.com/
-// @version      0.8.35
+// @version      0.8.36
 // @description  Adds Triplejack chat translation, message tools, and session tracking helpers.
 // @author       Rocco A.
 // @license      MIT
@@ -2023,7 +2023,7 @@
 
     const panelContainer = document.querySelector('[data-testid="panel-container"]');
     const panelRegion = panelContainer?.parentElement;
-    const hasPanel = Boolean(panelContainer && panelRegion && panelRegion.offsetParent !== null);
+    const hasPanel = Boolean(panelContainer && panelRegion && panelRegion.offsetParent !== null && hasHelperPanelOpen());
     resizeHandle.style.display = hasPanel ? "flex" : "none";
     if (hasPanel) {
       positionHelperPanelResizeHandle(panelRegion);
@@ -2195,7 +2195,7 @@
   }
 
   function deactivateHelperPanelSizingIfClosed() {
-    if (hasOpenPanel()) {
+    if (hasHelperPanelOpen()) {
       return;
     }
 
@@ -2217,7 +2217,7 @@
   }
 
   function reconcileHelperPanelSizingState() {
-    if (hasOpenPanel()) {
+    if (hasHelperPanelOpen()) {
       syncHelperPanelResizeHandle();
       return;
     }
@@ -2225,14 +2225,12 @@
     collapsePanelShellImmediately();
   }
 
-  function prepareHelperPanelWidthBeforeOpen() {
-    const panelWidth = getResolvedHelperPanelWidth();
-    activateHelperPanelSizing(panelWidth);
-    setNativeStageWidthStyle(panelWidth);
-  }
-
-  function hasOpenPanel() {
-    return Boolean(state.activePanelId || getActiveNativePanelButton());
+  function hasHelperPanelOpen() {
+    return Boolean(
+      state.activePanelId ||
+        helperPanelHost?.isConnected ||
+        document.querySelector("[data-tj-helper-panel-wrapper]"),
+    );
   }
 
   function clearPanelWidthStyle(element) {
@@ -2297,7 +2295,7 @@
 
   function scheduleHelperPanelCloseCleanup() {
     const cleanup = () => {
-      if (!hasOpenPanel()) {
+      if (!hasHelperPanelOpen()) {
         collapsePanelShellImmediately();
         return;
       }
@@ -2319,11 +2317,21 @@
     document.documentElement?.removeAttribute("data-tj-helper-panel-sizing-active");
     document.documentElement?.style.removeProperty("--tj-helper-panel-width");
 
-    if (panelRegion) {
+    const activeNativePanelButton = getActiveNativePanelButton();
+    if (panelRegion && (panelContainer?.dataset.tjHelperPanelContainer || panelRegion.dataset.tjHelperPanelRegion)) {
       panelRegion.style.display = "none";
       panelRegion.dataset.tjHelperHiddenEmpty = "1";
-    }
-    if (panelContainer) {
+      panelContainer.dataset.tjHelperHiddenEmpty = "1";
+    } else if (panelContainer && activeNativePanelButton) {
+      panelRegion?.style.removeProperty("display");
+      delete panelRegion?.dataset.tjHelperHiddenEmpty;
+      panelContainer.style.removeProperty("display");
+      delete panelContainer.dataset.tjHelperHiddenEmpty;
+    } else if (panelContainer && !panelContainer.children.length) {
+      if (panelRegion) {
+        panelRegion.style.display = "none";
+        panelRegion.dataset.tjHelperHiddenEmpty = "1";
+      }
       panelContainer.dataset.tjHelperHiddenEmpty = "1";
     }
 
@@ -2352,8 +2360,7 @@
   function scheduleNativePanelWidthApply() {
     const refresh = () => {
       const panelContainer = document.querySelector('[data-testid="panel-container"]');
-      const activeNativePanelButton = getActiveNativePanelButton();
-      if (!state.activePanelId && !activeNativePanelButton && !panelContainer?.dataset.tjHelperPanelContainer) {
+      if (!hasHelperPanelOpen() && !panelContainer?.dataset.tjHelperPanelContainer) {
         collapsePanelShellImmediately();
         return;
       }
@@ -2391,7 +2398,7 @@
       return;
     }
 
-    if (!state.activePanelId && isNativePanelButtonActive(nativePanelButton)) {
+    if (!state.activePanelId) {
       collapsePanelShellImmediately();
       window.setTimeout(() => {
         deactivateHelperPanelSizingIfClosed();
@@ -2403,10 +2410,6 @@
 
     ensureHelperPanelResizeHandle();
     scheduleNativePanelWidthApply();
-
-    if (!state.activePanelId) {
-      return;
-    }
 
     logPanelDebug("native-panel-pointerdown-switches-from-helper", {
       activePanelId: state.activePanelId,
@@ -2534,7 +2537,7 @@
   }
 
   function syncNativePanelGeometry() {
-    const panelContainer = hasOpenPanel() ? document.querySelector('[data-testid="panel-container"]') : null;
+    const panelContainer = hasHelperPanelOpen() ? document.querySelector('[data-testid="panel-container"]') : null;
     const panelRegion = panelContainer?.parentElement;
     if (!panelContainer || !panelRegion) {
       return;
@@ -2578,7 +2581,7 @@
       }
 
       const sceneRow = stageContainer.parentElement;
-      const panelRegion = hasOpenPanel()
+      const panelRegion = hasHelperPanelOpen()
         ? [...(sceneRow?.children || [])].find((child) => child.querySelector?.('[data-testid="panel-container"]'))
         : null;
       const panelWidth = Math.round(panelRegion?.getBoundingClientRect?.().width || 0);

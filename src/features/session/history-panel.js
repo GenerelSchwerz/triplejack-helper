@@ -531,7 +531,7 @@
   }
 
   function getHistorySplitGridStyle() {
-    return "display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,360px),1fr));gap:12px;margin-bottom:12px;";
+    return "display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,320px),1fr));gap:12px;margin-bottom:12px;";
   }
 
   function getHistorySectionStyle() {

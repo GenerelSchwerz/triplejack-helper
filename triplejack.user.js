@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Triplejack Helper
 // @namespace    https://triplejack.com/
-// @version      0.8.34
+// @version      0.8.35
 // @description  Adds Triplejack chat translation, message tools, and session tracking helpers.
 // @author       Rocco A.
 // @license      MIT
@@ -1712,7 +1712,6 @@
       nativeTitle: shellButton.title || "",
       nativeAriaLabel: shellButton.getAttribute("aria-label") || "",
     });
-    prepareHelperPanelWidthBeforeOpen();
     dispatchNativePanelPointerDown(shellButton);
     waitForNativePanelOpen(shellButton, () => {
       helperShellNativeButton = getActiveNativePanelButton() || shellButton;
@@ -2093,7 +2092,7 @@
     setPanelRegionWidthStyle(panelRegion, panelWidth);
     setPanelContainerWidthStyle(panelContainer, panelWidth);
     for (const child of panelContainer.children) {
-      if (child.matches?.("[data-tj-helper-panel-wrapper]")) {
+      if (child.matches?.("[data-tj-helper-panel-wrapper]") || !panelContainer.dataset.tjHelperPanelContainer) {
         setPanelFillStyle(child);
       }
     }
@@ -2352,7 +2351,6 @@
 
   function scheduleNativePanelWidthApply() {
     const refresh = () => {
-      prepareHelperPanelWidthBeforeOpen();
       const panelContainer = document.querySelector('[data-testid="panel-container"]');
       const activeNativePanelButton = getActiveNativePanelButton();
       if (!state.activePanelId && !activeNativePanelButton && !panelContainer?.dataset.tjHelperPanelContainer) {
@@ -2404,7 +2402,6 @@
     }
 
     ensureHelperPanelResizeHandle();
-    prepareHelperPanelWidthBeforeOpen();
     scheduleNativePanelWidthApply();
 
     if (!state.activePanelId) {

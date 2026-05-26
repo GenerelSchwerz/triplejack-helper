@@ -121,7 +121,7 @@
       controlEvent: QUICK_BOMB_CONTROL_EVENT,
       enabledStorageKey: QUICK_BOMB_ENABLED_STORAGE_KEY,
       rateStorageKey: QUICK_BOMB_RATE_STORAGE_KEY,
-      speedModeStorageKey: QUICK_BOMB_SPEED_MODE_STORAGE_KEY,
+      runModeStorageKey: QUICK_BOMB_RUN_MODE_STORAGE_KEY,
       modeStorageKey: QUICK_BOMB_MODE_STORAGE_KEY,
       durationStorageKey: QUICK_BOMB_DURATION_STORAGE_KEY,
       ammoStorageKey: QUICK_BOMB_AMMO_STORAGE_KEY,

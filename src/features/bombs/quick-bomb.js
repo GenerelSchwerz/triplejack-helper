@@ -141,7 +141,7 @@
       state.runSent = 0;
       state.targetSends = getTargetSends();
       setStatus(`quick bomb started ${getSelectedItemKey()} x${state.targetSends}`);
-      if (getSpeedMode() === "instant") {
+      if (getRunMode() === "instant" || getRunMode() === "one-off") {
         sendInstantBombs();
         return;
       }
@@ -215,6 +215,10 @@
     }
 
     function getTargetSends() {
+      if (getRunMode() === "one-off") {
+        return 1;
+      }
+
       if (getMode() === "ammo") {
         return getAmmoTargetSends();
       }
@@ -613,8 +617,9 @@
       return window.localStorage?.getItem(config.modeStorageKey) === "ammo" ? "ammo" : "duration";
     }
 
-    function getSpeedMode() {
-      return window.localStorage?.getItem(config.speedModeStorageKey) === "instant" ? "instant" : "timed";
+    function getRunMode() {
+      const mode = window.localStorage?.getItem(config.runModeStorageKey);
+      return ["one-off", "timed", "instant"].includes(mode) ? mode : "one-off";
     }
 
     function getDurationSeconds() {

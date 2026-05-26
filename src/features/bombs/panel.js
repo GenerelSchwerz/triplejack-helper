@@ -38,8 +38,9 @@
                 <input data-tj-helper-quick-bomb-rate type="number" step="any" min="1" max="1000" style="${getQuickBombInputStyle()}" />
               </label>
               <label style="${getQuickBombFieldStyle()}">
-                <span>Speed</span>
-                <select data-tj-helper-quick-bomb-speed-mode style="${getQuickBombInputStyle()}">
+                <span>Mode</span>
+                <select data-tj-helper-quick-bomb-run-mode style="${getQuickBombInputStyle()}">
+                  <option value="one-off">One-off</option>
                   <option value="timed">Timed</option>
                   <option value="instant">Instant</option>
                 </select>
@@ -110,8 +111,8 @@
       rateInput.addEventListener("input", (event) => {
         previousRateValue = parseFloat(event.target.value);
       });
-      quickBombPanel.querySelector("[data-tj-helper-quick-bomb-speed-mode]").addEventListener("change", (event) => {
-        setQuickBombSpeedMode(event.target.value);
+      quickBombPanel.querySelector("[data-tj-helper-quick-bomb-run-mode]").addEventListener("change", (event) => {
+        setQuickBombRunMode(event.target.value);
       });
       quickBombPanel.querySelector("[data-tj-helper-quick-bomb-mode]").addEventListener("change", (event) => {
         setQuickBombMode(event.target.value);
@@ -177,7 +178,7 @@
 
   function refreshQuickBombPanel() {
     const rateInput = quickBombPanel.querySelector("[data-tj-helper-quick-bomb-rate]");
-    const speedModeSelect = quickBombPanel.querySelector("[data-tj-helper-quick-bomb-speed-mode]");
+    const runModeSelect = quickBombPanel.querySelector("[data-tj-helper-quick-bomb-run-mode]");
     const modeSelect = quickBombPanel.querySelector("[data-tj-helper-quick-bomb-mode]");
     const durationInput = quickBombPanel.querySelector("[data-tj-helper-quick-bomb-duration]");
     const ammoInput = quickBombPanel.querySelector("[data-tj-helper-quick-bomb-ammo]");
@@ -192,7 +193,8 @@
     const targetsElement = quickBombPanel.querySelector("[data-tj-helper-quick-bomb-targets]");
 
     rateInput.value = String(getQuickBombRate());
-    speedModeSelect.value = getQuickBombSpeedMode();
+    const runMode = getQuickBombRunMode();
+    runModeSelect.value = runMode;
     modeSelect.value = getQuickBombMode();
     durationInput.value = String(getQuickBombDuration());
     ammoInput.value = String(getQuickBombAmmo());
@@ -200,6 +202,20 @@
     durationLabel.style.display = getQuickBombMode() === "duration" ? "" : "none";
     ammoControls.style.display = getQuickBombMode() === "ammo" ? "grid" : "none";
     ammoLabel.style.display = getQuickBombMode() === "ammo" ? "" : "none";
+    const disableRate = runMode === "instant" || runMode === "one-off";
+    const disableLimitOptions = runMode === "one-off";
+    rateInput.disabled = disableRate;
+    rateInput.style.opacity = disableRate ? ".48" : "1";
+    modeSelect.disabled = disableLimitOptions;
+    modeSelect.style.opacity = disableLimitOptions ? ".48" : "1";
+    durationInput.disabled = disableLimitOptions;
+    durationInput.style.opacity = disableLimitOptions ? ".48" : "1";
+    ammoInput.disabled = disableLimitOptions;
+    ammoInput.style.opacity = disableLimitOptions ? ".48" : "1";
+    for (const stepButton of ammoControls.querySelectorAll("[data-tj-helper-quick-bomb-ammo-step]")) {
+      stepButton.disabled = disableLimitOptions;
+      stepButton.style.opacity = disableLimitOptions ? ".48" : "1";
+    }
     itemSortSelect.value = getQuickBombItemSort();
 
     const players = Array.isArray(state.quickBombPlayers) ? state.quickBombPlayers : [];

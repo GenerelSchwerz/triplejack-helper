@@ -29,8 +29,9 @@
     );
   }
 
-  function getQuickBombSpeedMode() {
-    return localStorage.getItem(QUICK_BOMB_SPEED_MODE_STORAGE_KEY) === "instant" ? "instant" : "timed";
+  function getQuickBombRunMode() {
+    const mode = localStorage.getItem(QUICK_BOMB_RUN_MODE_STORAGE_KEY);
+    return ["one-off", "timed", "instant"].includes(mode) ? mode : "one-off";
   }
 
   function getQuickBombMode() {
@@ -128,10 +129,10 @@
     renderQuickBombPanel();
   }
 
-  function setQuickBombSpeedMode(mode) {
-    const value = mode === "instant" ? "instant" : "timed";
-    localStorage.setItem(QUICK_BOMB_SPEED_MODE_STORAGE_KEY, value);
-    setStatus(`quick bomb speed set to ${value}`);
+  function setQuickBombRunMode(mode) {
+    const value = ["one-off", "timed", "instant"].includes(mode) ? mode : "one-off";
+    localStorage.setItem(QUICK_BOMB_RUN_MODE_STORAGE_KEY, value);
+    setStatus(`quick bomb mode set to ${value}`);
     renderStatusPanel();
     renderQuickBombPanel();
   }

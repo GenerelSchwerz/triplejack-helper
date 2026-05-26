@@ -8,7 +8,7 @@
   const SESSION_HISTORY_STORAGE_KEY = "triplejack-helper-session-history";
   const QUICK_BOMB_ENABLED_STORAGE_KEY = "triplejack-helper-quick-bomb-enabled";
   const QUICK_BOMB_RATE_STORAGE_KEY = "triplejack-helper-quick-bomb-rate";
-  const QUICK_BOMB_SPEED_MODE_STORAGE_KEY = "triplejack-helper-quick-bomb-speed-mode";
+  const QUICK_BOMB_RUN_MODE_STORAGE_KEY = "triplejack-helper-quick-bomb-run-mode";
   const QUICK_BOMB_MODE_STORAGE_KEY = "triplejack-helper-quick-bomb-mode";
   const QUICK_BOMB_DURATION_STORAGE_KEY = "triplejack-helper-quick-bomb-duration";
   const QUICK_BOMB_AMMO_STORAGE_KEY = "triplejack-helper-quick-bomb-ammo";

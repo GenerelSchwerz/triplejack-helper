@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Triplejack Helper
 // @namespace    https://triplejack.com/
-// @version      0.8.51
+// @version      0.8.52
 // @description  Adds Triplejack chat translation, message tools, and session tracking helpers.
 // @author       Rocco A.
 // @license      MIT
@@ -35,7 +35,7 @@
   const SESSION_HISTORY_STORAGE_KEY = "triplejack-helper-session-history";
   const QUICK_BOMB_ENABLED_STORAGE_KEY = "triplejack-helper-quick-bomb-enabled";
   const QUICK_BOMB_RATE_STORAGE_KEY = "triplejack-helper-quick-bomb-rate";
-  const QUICK_BOMB_SPEED_MODE_STORAGE_KEY = "triplejack-helper-quick-bomb-speed-mode";
+  const QUICK_BOMB_RUN_MODE_STORAGE_KEY = "triplejack-helper-quick-bomb-run-mode";
   const QUICK_BOMB_MODE_STORAGE_KEY = "triplejack-helper-quick-bomb-mode";
   const QUICK_BOMB_DURATION_STORAGE_KEY = "triplejack-helper-quick-bomb-duration";
   const QUICK_BOMB_AMMO_STORAGE_KEY = "triplejack-helper-quick-bomb-ammo";
@@ -741,7 +741,7 @@
       state.runSent = 0;
       state.targetSends = getTargetSends();
       setStatus(`quick bomb started ${getSelectedItemKey()} x${state.targetSends}`);
-      if (getSpeedMode() === "instant") {
+      if (getRunMode() === "instant" || getRunMode() === "one-off") {
         sendInstantBombs();
         return;
       }
@@ -815,6 +815,10 @@
     }
 
     function getTargetSends() {
+      if (getRunMode() === "one-off") {
+        return 1;
+      }
+
       if (getMode() === "ammo") {
         return getAmmoTargetSends();
       }
@@ -1213,8 +1217,9 @@
       return window.localStorage?.getItem(config.modeStorageKey) === "ammo" ? "ammo" : "duration";
     }
 
-    function getSpeedMode() {
-      return window.localStorage?.getItem(config.speedModeStorageKey) === "instant" ? "instant" : "timed";
+    function getRunMode() {
+      const mode = window.localStorage?.getItem(config.runModeStorageKey);
+      return ["one-off", "timed", "instant"].includes(mode) ? mode : "one-off";
     }
 
     function getDurationSeconds() {
@@ -1618,7 +1623,7 @@
       controlEvent: QUICK_BOMB_CONTROL_EVENT,
       enabledStorageKey: QUICK_BOMB_ENABLED_STORAGE_KEY,
       rateStorageKey: QUICK_BOMB_RATE_STORAGE_KEY,
-      speedModeStorageKey: QUICK_BOMB_SPEED_MODE_STORAGE_KEY,
+      runModeStorageKey: QUICK_BOMB_RUN_MODE_STORAGE_KEY,
       modeStorageKey: QUICK_BOMB_MODE_STORAGE_KEY,
       durationStorageKey: QUICK_BOMB_DURATION_STORAGE_KEY,
       ammoStorageKey: QUICK_BOMB_AMMO_STORAGE_KEY,
@@ -2648,8 +2653,9 @@
     );
   }
 
-  function getQuickBombSpeedMode() {
-    return localStorage.getItem(QUICK_BOMB_SPEED_MODE_STORAGE_KEY) === "instant" ? "instant" : "timed";
+  function getQuickBombRunMode() {
+    const mode = localStorage.getItem(QUICK_BOMB_RUN_MODE_STORAGE_KEY);
+    return ["one-off", "timed", "instant"].includes(mode) ? mode : "one-off";
   }
 
   function getQuickBombMode() {
@@ -2747,10 +2753,10 @@
     renderQuickBombPanel();
   }
 
-  function setQuickBombSpeedMode(mode) {
-    const value = mode === "instant" ? "instant" : "timed";
-    localStorage.setItem(QUICK_BOMB_SPEED_MODE_STORAGE_KEY, value);
-    setStatus(`quick bomb speed set to ${value}`);
+  function setQuickBombRunMode(mode) {
+    const value = ["one-off", "timed", "instant"].includes(mode) ? mode : "one-off";
+    localStorage.setItem(QUICK_BOMB_RUN_MODE_STORAGE_KEY, value);
+    setStatus(`quick bomb mode set to ${value}`);
     renderStatusPanel();
     renderQuickBombPanel();
   }
@@ -5141,8 +5147,9 @@
                 <input data-tj-helper-quick-bomb-rate type="number" step="any" min="1" max="1000" style="${getQuickBombInputStyle()}" />
               </label>
               <label style="${getQuickBombFieldStyle()}">
-                <span>Speed</span>
-                <select data-tj-helper-quick-bomb-speed-mode style="${getQuickBombInputStyle()}">
+                <span>Mode</span>
+                <select data-tj-helper-quick-bomb-run-mode style="${getQuickBombInputStyle()}">
+                  <option value="one-off">One-off</option>
                   <option value="timed">Timed</option>
                   <option value="instant">Instant</option>
                 </select>
@@ -5213,8 +5220,8 @@
       rateInput.addEventListener("input", (event) => {
         previousRateValue = parseFloat(event.target.value);
       });
-      quickBombPanel.querySelector("[data-tj-helper-quick-bomb-speed-mode]").addEventListener("change", (event) => {
-        setQuickBombSpeedMode(event.target.value);
+      quickBombPanel.querySelector("[data-tj-helper-quick-bomb-run-mode]").addEventListener("change", (event) => {
+        setQuickBombRunMode(event.target.value);
       });
       quickBombPanel.querySelector("[data-tj-helper-quick-bomb-mode]").addEventListener("change", (event) => {
         setQuickBombMode(event.target.value);
@@ -5280,7 +5287,7 @@
 
   function refreshQuickBombPanel() {
     const rateInput = quickBombPanel.querySelector("[data-tj-helper-quick-bomb-rate]");
-    const speedModeSelect = quickBombPanel.querySelector("[data-tj-helper-quick-bomb-speed-mode]");
+    const runModeSelect = quickBombPanel.querySelector("[data-tj-helper-quick-bomb-run-mode]");
     const modeSelect = quickBombPanel.querySelector("[data-tj-helper-quick-bomb-mode]");
     const durationInput = quickBombPanel.querySelector("[data-tj-helper-quick-bomb-duration]");
     const ammoInput = quickBombPanel.querySelector("[data-tj-helper-quick-bomb-ammo]");
@@ -5295,7 +5302,8 @@
     const targetsElement = quickBombPanel.querySelector("[data-tj-helper-quick-bomb-targets]");
 
     rateInput.value = String(getQuickBombRate());
-    speedModeSelect.value = getQuickBombSpeedMode();
+    const runMode = getQuickBombRunMode();
+    runModeSelect.value = runMode;
     modeSelect.value = getQuickBombMode();
     durationInput.value = String(getQuickBombDuration());
     ammoInput.value = String(getQuickBombAmmo());
@@ -5303,6 +5311,20 @@
     durationLabel.style.display = getQuickBombMode() === "duration" ? "" : "none";
     ammoControls.style.display = getQuickBombMode() === "ammo" ? "grid" : "none";
     ammoLabel.style.display = getQuickBombMode() === "ammo" ? "" : "none";
+    const disableRate = runMode === "instant" || runMode === "one-off";
+    const disableLimitOptions = runMode === "one-off";
+    rateInput.disabled = disableRate;
+    rateInput.style.opacity = disableRate ? ".48" : "1";
+    modeSelect.disabled = disableLimitOptions;
+    modeSelect.style.opacity = disableLimitOptions ? ".48" : "1";
+    durationInput.disabled = disableLimitOptions;
+    durationInput.style.opacity = disableLimitOptions ? ".48" : "1";
+    ammoInput.disabled = disableLimitOptions;
+    ammoInput.style.opacity = disableLimitOptions ? ".48" : "1";
+    for (const stepButton of ammoControls.querySelectorAll("[data-tj-helper-quick-bomb-ammo-step]")) {
+      stepButton.disabled = disableLimitOptions;
+      stepButton.style.opacity = disableLimitOptions ? ".48" : "1";
+    }
     itemSortSelect.value = getQuickBombItemSort();
 
     const players = Array.isArray(state.quickBombPlayers) ? state.quickBombPlayers : [];

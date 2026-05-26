@@ -178,9 +178,9 @@
           state.quickBombActive ? ` | remaining ${state.quickBombRemaining || 0}` : ""
         }`
       : "Select an item or throw one bomb.";
-
-    renderQuickBombItems(itemsElement);
     renderQuickBombTargets(targetsElement);
+    renderQuickBombItems(itemsElement);
+
   }
 
   function renderQuickBombItems(itemsElement) {

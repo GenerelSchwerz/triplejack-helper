@@ -488,8 +488,10 @@
     return `
       <div style="${getHistoryRoomRowStyle()}">
         <span style="${getHistoryRoomLabelStyle()}" title="${escapeHistoryAttribute(roomStats.roomType)}">${escapeHistoryHtml(roomStats.roomType)}</span>
-        <span style="${getHistoryRowMutedValueStyle()}">${roomStats.sessions} ses</span>
-        <strong style="${getHistoryRowMetricStyle(getHistoryStatColor(roomStats.bigBlindDelta))}">${formatHistorySigned(roomStats.bigBlindsPerHour)}/h</strong>
+        <span style="${getHistoryRoomMetricsStyle()}">
+          <span style="${getHistoryRowMutedValueStyle()}">${roomStats.sessions} ses</span>
+          <strong style="${getHistoryRowMetricStyle(getHistoryStatColor(roomStats.bigBlindDelta))}">${formatHistorySigned(roomStats.bigBlindsPerHour)}/h</strong>
+        </span>
       </div>
     `;
   }
@@ -547,7 +549,7 @@
   }
 
   function getHistoryRoomRowStyle() {
-    return "display:grid;grid-template-columns:minmax(0,1fr) minmax(34px,auto) minmax(62px,auto);gap:6px;align-items:start;min-width:0;";
+    return "display:flex;flex-wrap:wrap;gap:4px 10px;align-items:center;min-width:0;overflow:visible;";
   }
 
   function getHistorySessionRowStyle() {
@@ -559,7 +561,11 @@
   }
 
   function getHistoryRoomLabelStyle() {
-    return "min-width:0;overflow:visible;white-space:normal;overflow-wrap:anywhere;";
+    return "flex:0 0 auto;max-width:100%;overflow:visible;white-space:nowrap;";
+  }
+
+  function getHistoryRoomMetricsStyle() {
+    return "display:flex;gap:10px;align-items:center;justify-content:flex-end;flex:0 0 auto;margin-left:auto;white-space:nowrap;";
   }
 
   function getHistoryRowMutedValueStyle() {

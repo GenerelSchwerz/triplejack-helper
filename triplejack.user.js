@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Triplejack Helper
 // @namespace    https://triplejack.com/
-// @version      0.8.30
+// @version      0.8.31
 // @description  Adds Triplejack chat translation, message tools, and session tracking helpers.
 // @author       Rocco A.
 // @license      MIT
@@ -5169,6 +5169,10 @@
             <div data-tj-helper-quick-bomb-status style="margin-top:6px;color:#8FB8C4;font-size:11px;"></div>
           </section>
           <section style="border:1px solid rgba(191,231,241,.2);border-radius:6px;padding:10px;background:rgba(255,255,255,.025);">
+            <div style="margin-bottom:8px;color:#E9F7FA;font-weight:700;">Targets</div>
+            <div data-tj-helper-quick-bomb-targets style="display:grid;gap:6px;"></div>
+          </section>
+          <section style="border:1px solid rgba(191,231,241,.2);border-radius:6px;padding:10px;background:rgba(255,255,255,.025);">
             <div style="display:grid;grid-template-columns:minmax(0,1fr) 112px;gap:8px;align-items:center;margin-bottom:8px;">
               <div style="color:#E9F7FA;font-weight:700;">Items</div>
               <select data-tj-helper-quick-bomb-item-sort style="min-width:0;background:#DDEAF2;color:#111;border:1px solid #74A7B9;border-radius:4px;padding:4px;">
@@ -5178,10 +5182,6 @@
               </select>
             </div>
             <div data-tj-helper-quick-bomb-items style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;"></div>
-          </section>
-          <section style="border:1px solid rgba(191,231,241,.2);border-radius:6px;padding:10px;background:rgba(255,255,255,.025);">
-            <div style="margin-bottom:8px;color:#E9F7FA;font-weight:700;">Targets</div>
-            <div data-tj-helper-quick-bomb-targets style="display:grid;gap:6px;"></div>
           </section>
         </div>
       `;
